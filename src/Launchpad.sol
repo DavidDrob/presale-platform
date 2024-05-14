@@ -1,5 +1,18 @@
 pragma solidity ^0.8.20;
 
+import "forge-std/interfaces/IERC20.sol";
+
+struct MainLaunchpadInfo {
+    string name;
+    IERC20 token;
+
+    uint256 startDate;
+    uint256 endDate;
+    uint256 releaseDelay;
+    uint256 vestingDuration;
+}
+
+
 contract Launchpad {
     // Events
     event TokensPurchased(address indexed _token, address indexed buyer, uint256
@@ -16,8 +29,14 @@ contract Launchpad {
     event VestingDurationUpdated(uint256 newVestingDuration);
 
     // Modifiers
-    modifier onlyOperator() {}
-    modifier nonReentrant() {} // use OZ implementation
+    modifier onlyOperator() {
+        _;
+    }
+
+    // use OZ implementation
+    modifier nonReentrant() {
+        _;
+    } 
 
     // Variables
     address public operator;
@@ -148,7 +167,8 @@ contract Launchpad {
         require(totalPurchasedAmount + tokenAmount < tokenHardCap);
 
     	// ensure amount is in allowed range 
-        require(minTokenBuy < tokenAmount <= maxTokenBuy);
+        require(minTokenBuy < tokenAmount &&
+                tokenAmount <= maxTokenBuy);
 
 
         // update `purchasedAmount` and `totalPurchasedAmount`
@@ -188,5 +208,7 @@ contract Launchpad {
         require(isEnded());
     }
 
-    function transferPurchasedOwnership(address _newOwner) external;
+    function transferPurchasedOwnership(address _newOwner) external {
+        address x = _newOwner; // for compiler, implement later
+    }
 }
