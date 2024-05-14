@@ -5,6 +5,12 @@ import "forge-std/interfaces/IERC20.sol";
 struct MainLaunchpadInfo {
     string name;
     IERC20 token;
+    uint256 ethPricePerToken;
+    uint256 decimals;
+    uint256 tokenHardCap;
+    uint256 minTokenBuy;
+    uint256 maxTokenBuy;
+
 
     uint256 startDate;
     uint256 endDate;
@@ -42,8 +48,8 @@ contract Launchpad {
     address public operator;
     string public name;
     IERC20 public immutable token;
-    uint256 public immutable decimals; // decimals are already stored in `token`
-    uint256 public immutable tokenUnit;
+    uint256 public immutable decimals; // decimals of native token
+    // uint256 public immutable tokenUnit; // decimals are already stored in `token`
     address public immutable factory;
     uint256 public ethPricePerToken;
     uint256 public tokenHardCap;
@@ -67,21 +73,24 @@ contract Launchpad {
     _protocolFeeAddress, address _operator, address _factory) {
         name = _info.name;
         token = _info.token;
+        ethPricePerToken = _info.ethPricePerToken;
+        decimals = _info.decimals;
+        tokenHardCap = _info.tokenHardCap;
+        minTokenBuy = _info.minTokenBuy;
+        maxTokenBuy = _info.maxTokenBuy;
 
         startDate = _info.startDate;
         endDate = _info.endDate;
         releaseDelay = _info.releaseDelay; // e.g. 1 days (86400)
         vestingDuration = _info.vestingDuration; 
-        // if vestingDuration was before releaseDay + endDate
-        // it could cause problems calculating the claimAmount during vesting later
-        require(vestingDuration >= releaseDelay + endDate); 
 
-        // assign remaining values from _info to local variables
-        // ...
+        // if releaseDelay was after vestingDuration
+        // it could cause problems calculating the claimAmount during vesting later
+        require(vestingDuration >= releaseDelay, "Vesting starts after releaseDelay"); 
 
         protocolFeeAddress = _protocolFeeAddress;
         operator = _operator;
-        // ...
+        factory = _factory;
     }
 
     // Contract functions
@@ -100,6 +109,8 @@ contract Launchpad {
     }
 
     function isClaimable() public view returns (bool) {
+        return false;
+        // TODO: check if operator provided liquidity
         return block.timestamp >= endDate + releaseDelay;
     }
 
@@ -111,11 +122,21 @@ contract Launchpad {
     }
 
     // only allow updating startDate before the pre-sale starts
-    function updateStartDate(uint _newStartDate) external onlyOperator {}
+    function updateStartDate(uint _newStartDate) external onlyOperator {
+        require(!isStarted(), "Cannot change start date when the pre-sale already started");
+        require(_newStartDate < endDate, "Cannot start before the end");
+
+        startDate = _newStartDate;
+    }
 
     // only allow updating endDate before the vesting starts
     // otherwise tokens could be claimed before the pre-sale ends
-    function updateEndDate(uint _newEndDate) external onlyOperator {}
+    function updateEndDate(uint _newEndDate) external onlyOperator {
+        require(!isClaimable(), "Cannot change end date after vesting started");
+        require(startDate < _newEndDate, "Cannot end before the start");
+
+        endDate = _newEndDate;
+    }
 
 
     function updateWhitelist(uint256 _wlBlockNumber, uint256 _wlMinBalance,
