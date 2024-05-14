@@ -72,4 +72,19 @@ contract LaunchPadTest is Test {
 		assertLt(launchpad.startDate(), launchpad.endDate());
 		assertEq(launchpad.endDate(), _newDate);
 	}
+
+	function test_onlyOperator() public {
+		string memory nameBefore = launchpad.name();
+
+		vm.prank(makeAddr("badActor"));
+		vm.expectRevert();
+		launchpad.setName("Foobar");
+
+		assertEq(launchpad.name(), nameBefore);
+
+		vm.prank(team);
+		launchpad.setName("Foobar");
+		
+		assertNotEq(launchpad.name(), nameBefore);
+	}
 }

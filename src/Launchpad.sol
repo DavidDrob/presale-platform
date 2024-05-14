@@ -11,7 +11,6 @@ struct MainLaunchpadInfo {
     uint256 minTokenBuy;
     uint256 maxTokenBuy;
 
-
     uint256 startDate;
     uint256 endDate;
     uint256 releaseDelay;
@@ -36,6 +35,8 @@ contract Launchpad {
 
     // Modifiers
     modifier onlyOperator() {
+        require(msg.sender == operator);
+
         _;
     }
 
@@ -157,6 +158,8 @@ contract Launchpad {
     // only allow updating vestingDuration before the vesting starts
     // otherwise it could mess up the calculation of the claimable amounts in a vesting timeframe
     function setVestingDuration(uint256 _vestingDuration) external onlyOperator {
+        require(!isClaimable(), "Cannot change vesting duration after vesting started");
+
         vestingDuration = _vestingDuration;
     }
 
