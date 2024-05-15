@@ -1,6 +1,7 @@
 pragma solidity ^0.8.20;
 
-import "forge-std/interfaces/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 struct MainLaunchpadInfo {
     string name;
@@ -19,6 +20,8 @@ struct MainLaunchpadInfo {
 
 
 contract Launchpad {
+    using SafeERC20 for IERC20;
+
     // Events
     event TokensPurchased(address indexed _token, address indexed buyer, uint256
     amount);
@@ -68,6 +71,7 @@ contract Launchpad {
     uint256 public wlBlockNumber;
     uint256 public wlMinBalance;
     bytes32 public wlRoot;
+    bool public initialized;
 
     //  Constructor
     constructor(MainLaunchpadInfo memory _info, uint256 _protocolFee, address
@@ -117,6 +121,11 @@ contract Launchpad {
 
     // *** ONLY OPERATOR SETTERS *** //
     // only authorized actors should be able to modify these parameters so we use `onlyOperator`
+    function initialize() external onlyOperator {
+        token.safeTransferFrom(msg.sender, address(this), tokenHardCap);
+
+        initialized = true;
+    }
 
     function transferOperatorOwnership(address newOperator) external onlyOperator {
 	    operator = newOperator;
@@ -148,11 +157,13 @@ contract Launchpad {
     }
 
     function increaseHardCap(uint256 _tokenHardCapIncrement) external onlyOperator {
-	// use unchecked only if we assume the operator knows what they're doing.
-    // unchecked saves gas
-	// unchecked {
-        tokenHardCap += _tokenHardCapIncrement;
-	// }
+        token.safeTransferFrom(msg.sender, address(this), _tokenHardCapIncrement);
+
+        // use unchecked only if we assume the operator knows what they're doing.
+        // unchecked saves gas
+        unchecked {
+            tokenHardCap += _tokenHardCapIncrement;
+        }
     }
 
     // only allow updating vestingDuration before the vesting starts

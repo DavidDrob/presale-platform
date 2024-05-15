@@ -1,7 +1,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "forge-std/mocks/MockERC20.sol";
+import "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
 import "src/Launchpad.sol";
 
@@ -11,11 +11,12 @@ contract LaunchPadTest is Test {
 	address treasury = makeAddr("treasury");
 	uint256 protocolFee = 100; // 1% in BP
 
+	ERC20Mock mockToken;
 	Launchpad launchpad;
 
 	function setUp() public {
-		MockERC20 mockToken = new MockERC20();
-		mockToken.initialize("Sample Token", "STKN", 18);
+		mockToken = new ERC20Mock();
+		mockToken.mint(team, 100_000e18);
 
 		// skip, so block.timestamp doesn't underflow in some tests
 		skip(11 days);
@@ -35,7 +36,12 @@ contract LaunchPadTest is Test {
 			vestingDuration: 7 days
 		});
 
+		// TODO: use CREATE2 to get a predeterministic address to prevent an extra call
+		vm.startPrank(team);
 		launchpad = new Launchpad(info, protocolFee, treasury, team, factory);
+		mockToken.approve(address(launchpad), type(uint256).max);
+		launchpad.initialize();
+		vm.stopPrank();
 	}
 
 	function test_periods() public {
@@ -86,5 +92,15 @@ contract LaunchPadTest is Test {
 		launchpad.setName("Foobar");
 		
 		assertNotEq(launchpad.name(), nameBefore);
+	}
+
+	function test_tokenAmountInLaunchpad(uint _increase) public {
+		vm.assume(_increase < 100_000 ether - 1_000 ether);
+		assertGe(mockToken.balanceOf(address(launchpad)), 1_000 ether);
+
+		vm.startPrank(team);
+		launchpad.increaseHardCap(_increase);
+
+		assertGe(mockToken.balanceOf(address(launchpad)), _increase + 1_000 ether);
 	}
 }
