@@ -93,6 +93,7 @@ contract Launchpad {
         // it could cause problems calculating the claimAmount during vesting later
         require(vestingDuration >= releaseDelay, "Vesting starts after releaseDelay"); 
 
+        protocolFee = _protocolFee;
         protocolFeeAddress = _protocolFeeAddress;
         operator = _operator;
         factory = _factory;
@@ -194,6 +195,9 @@ contract Launchpad {
         return (ethAmount - protocolFee) / ethPricePerToken;
     }
 
+    // NOTE: make proof optional, by making `buyTokens` internal and adding
+    // one more external function without the proof parameter
+    //
     // use `nonReentrant` so the user can't abuse msg.value to purchase more then they deposit
     function buyTokens(bytes32[] calldata proof) external payable nonReentrant {
         uint256 tokenAmount = ethToToken(msg.value); // protocol fee is accounted in `ethToToken` already
@@ -207,6 +211,8 @@ contract Launchpad {
 
 
         // update `purchasedAmount` and `totalPurchasedAmount`
+        purchasedAmount[msg.sender] = tokenAmount;
+        totalPurchasedAmount += tokenAmount;
     }
 
     function claimableAmount(address _address) external view returns (uint256) {

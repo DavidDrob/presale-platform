@@ -103,4 +103,23 @@ contract LaunchPadTest is Test {
 
 		assertGe(mockToken.balanceOf(address(launchpad)), _increase + 1_000 ether);
 	}
+
+	function test_buy(uint _amount) public {
+		vm.assume(_amount >= launchpad.ethPricePerToken()
+				  && _amount >= launchpad.minTokenBuy()
+				  && _amount <= launchpad.tokenHardCap() - launchpad.totalPurchasedAmount()
+		);
+
+		address alice = makeAddr("alice");
+		vm.deal(alice, type(uint256).max);
+
+		bytes32[] memory emptyBytes;
+		uint256 totalAmountBefore = launchpad.totalPurchasedAmount();
+
+		vm.prank(alice);
+		launchpad.buyTokens{value: _amount}(emptyBytes);
+		
+		assertEq(launchpad.purchasedAmount(alice), launchpad.ethToToken(_amount));
+		assertEq(launchpad.totalPurchasedAmount(), totalAmountBefore + launchpad.ethToToken(_amount));
+	}
 }
