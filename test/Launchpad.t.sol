@@ -117,9 +117,22 @@ contract LaunchPadTest is Test {
 		uint256 totalAmountBefore = launchpad.totalPurchasedAmount();
 
 		vm.prank(alice);
+		vm.expectRevert();
 		launchpad.buyTokens{value: _amount}(emptyBytes);
 		
+		assertEq(launchpad.purchasedAmount(alice), 0);
+		assertEq(launchpad.totalPurchasedAmount(), 0);
+
+		skip(2 days);
+		vm.prank(alice);
+		launchpad.buyTokens{value: _amount}(emptyBytes);
+
 		assertEq(launchpad.purchasedAmount(alice), launchpad.ethToToken(_amount));
 		assertEq(launchpad.totalPurchasedAmount(), totalAmountBefore + launchpad.ethToToken(_amount));
+
+		skip(5 days);
+		vm.prank(alice);
+		vm.expectRevert();
+		launchpad.buyTokens{value: _amount}(emptyBytes);
 	}
 }

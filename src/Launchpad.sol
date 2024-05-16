@@ -200,15 +200,17 @@ contract Launchpad {
     //
     // use `nonReentrant` so the user can't abuse msg.value to purchase more then they deposit
     function buyTokens(bytes32[] calldata proof) external payable nonReentrant {
+        require(isStarted(), "presale not started");
+        require(!isEnded(), "presale ended");
+
         uint256 tokenAmount = ethToToken(msg.value); // protocol fee is accounted in `ethToToken` already
 
     	// ensure the amount doesn't overflow the hardcap
         require(totalPurchasedAmount + tokenAmount < tokenHardCap);
 
     	// ensure amount is in allowed range 
-        require(minTokenBuy < tokenAmount &&
+        require(minTokenBuy <= tokenAmount &&
                 tokenAmount <= maxTokenBuy);
-
 
         // update `purchasedAmount` and `totalPurchasedAmount`
         purchasedAmount[msg.sender] = tokenAmount;
