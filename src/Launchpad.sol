@@ -199,7 +199,7 @@ contract Launchpad {
         uniswapFactory.createPool(WETH, address(token), uint24(500));
 
         // TODO: withdraw ETH, wrap it
-        // calculate token amount to deposit to keep price below `ethPricePerToken`
+        // calculate token amount to deposit to keep price above `ethPricePerToken`
     }
     // *** ONLY OPERATOR SETTERS *** //
 
