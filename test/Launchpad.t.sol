@@ -135,4 +135,12 @@ contract LaunchPadTest is Test {
 		vm.expectRevert();
 		launchpad.buyTokens{value: _amount}(emptyBytes);
 	}
+
+	function test_createLP() public {
+		skip(8 days);
+
+		vm.startPrank(team);
+		launchpad.createLp();
+		vm.stopPrank();
+	}
 }

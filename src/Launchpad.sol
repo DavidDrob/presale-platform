@@ -3,6 +3,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import "./interfaces/IUniswapV3Factory.sol";
+
 struct MainLaunchpadInfo {
     string name;
     IERC20 token;
@@ -48,6 +50,9 @@ contract Launchpad {
         _;
     } 
 
+    // constants
+    address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+
     // Variables
     address public operator;
     string public name;
@@ -72,6 +77,8 @@ contract Launchpad {
     uint256 public wlMinBalance;
     bytes32 public wlRoot;
     bool public initialized;
+
+    IUniswapV3Factory uniswapFactory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
 
     //  Constructor
     constructor(MainLaunchpadInfo memory _info, uint256 _protocolFee, address
@@ -183,6 +190,16 @@ contract Launchpad {
 
     function setName(string memory _name) external onlyOperator {
         name = _name;
+    }
+
+    function createLp() external onlyOperator {
+        require(isEnded(), "presale didn't end yet");
+
+        // 0.05% is the lowest fee possible
+        uniswapFactory.createPool(WETH, address(token), uint24(500));
+
+        // TODO: withdraw ETH, wrap it
+        // calculate token amount to deposit to keep price below `ethPricePerToken`
     }
     // *** ONLY OPERATOR SETTERS *** //
 
