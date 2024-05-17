@@ -3,7 +3,9 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "./interfaces/IUniswapV3Factory.sol";
+import "./interfaces/IUniswapV2Router02.sol";
+import "./interfaces/IUniswapV2Factory.sol";
+
 
 struct MainLaunchpadInfo {
     string name;
@@ -78,7 +80,8 @@ contract Launchpad {
     bytes32 public wlRoot;
     bool public initialized;
 
-    IUniswapV3Factory uniswapFactory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
+    IUniswapV2Factory uniswapFactory = IUniswapV2Factory(0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f);
+    IUniswapV2Router02 uniswapRouter = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
     //  Constructor
     constructor(MainLaunchpadInfo memory _info, uint256 _protocolFee, address
@@ -192,14 +195,21 @@ contract Launchpad {
         name = _name;
     }
 
-    function createLp() external onlyOperator {
+    function createLp(uint tokenIn) external onlyOperator returns (address) {
         require(isEnded(), "presale didn't end yet");
 
-        // 0.05% is the lowest fee possible
-        uniswapFactory.createPool(WETH, address(token), uint24(500));
+        token.safeTransferFrom(operator, address(this), tokenIn);
+        token.approve(address(uniswapRouter), tokenIn);
 
-        // TODO: withdraw ETH, wrap it
-        // calculate token amount to deposit to keep price above `ethPricePerToken`
+        address pool = uniswapFactory.createPair(WETH, address(token));
+
+        uint ethIn = (totalPurchasedAmount * ethPricePerToken) / decimals; // prevent donation attack
+        require (tokenIn < ethIn, "price is below ethPricePerToken");
+
+        // TODO: add slippage
+        uniswapRouter.addLiquidityETH{value: ethIn}(address(token), tokenIn, 0, 0, operator, block.timestamp);
+
+        return pool;
     }
     // *** ONLY OPERATOR SETTERS *** //
 
@@ -209,7 +219,8 @@ contract Launchpad {
     // 
     // this function should be public as it's also used internally.
     function ethToToken(uint256 ethAmount) public view returns (uint256) {
-        return (ethAmount - protocolFee) / ethPricePerToken;
+        // TODO: add fee calculation
+        return (ethAmount * decimals) / ethPricePerToken;
     }
 
     // NOTE: make proof optional, by making `buyTokens` internal and adding

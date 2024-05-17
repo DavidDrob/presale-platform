@@ -4,6 +4,7 @@ import "forge-std/Test.sol";
 import "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
 import "src/Launchpad.sol";
+import "./utils/UniswapV2Library.sol";
 
 contract LaunchPadTest is Test {
 	address factory = makeAddr("factory");
@@ -137,10 +138,27 @@ contract LaunchPadTest is Test {
 	}
 
 	function test_createLP() public {
-		skip(8 days);
+		address alice = makeAddr("alice");
+		vm.deal(alice, type(uint256).max);
+
+		uint ethIn = 5 ether;
+		uint tokenIn = (ethIn / (1e18 / launchpad.ethPricePerToken()));
+
+		skip(2 days);
+
+		bytes32[] memory emptyBytes;
+		vm.prank(alice);
+		launchpad.buyTokens{value: ethIn}(emptyBytes);
+
+		skip(5 days);
 
 		vm.startPrank(team);
-		launchpad.createLp();
+		address pool = launchpad.createLp(tokenIn);
 		vm.stopPrank();
+
+		assertFalse(pool == address(0));
+
+		uint newEthpricePerToken = UniswapV2Library.getAmountOut(1 ether, ethIn, tokenIn);
+		assertLt(newEthpricePerToken, launchpad.ethPricePerToken());
 	}
 }
