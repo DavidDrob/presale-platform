@@ -142,7 +142,9 @@ contract LaunchPadTest is Test {
 		vm.deal(alice, type(uint256).max);
 
 		uint ethIn = 5 ether;
-		uint tokenIn = (ethIn / (1e18 / launchpad.ethPricePerToken()));
+		// TODO: transform getAmountOut to get a min amountIn to keep the price above
+		// the fixed price in Launchpad.
+		uint tokenIn = (ethIn / (1e18 / launchpad.ethPricePerToken()) * 2);
 
 		skip(2 days);
 
@@ -159,6 +161,6 @@ contract LaunchPadTest is Test {
 		assertFalse(pool == address(0));
 
 		uint newEthpricePerToken = UniswapV2Library.getAmountOut(1 ether, ethIn, tokenIn);
-		assertLt(newEthpricePerToken, launchpad.ethPricePerToken());
+		assertGt(newEthpricePerToken, launchpad.ethPricePerToken());
 	}
 }
