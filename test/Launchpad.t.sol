@@ -26,13 +26,13 @@ contract LaunchPadTest is Test {
 		// skip, so block.timestamp doesn't underflow in some tests
 		skip(11 days);
 
-		// TODO: use CREATE2 to get a predeterministic address to prevent an extra call (initialize)
-        MainLaunchpadInfo memory info = SampleData._getSampleInfo(address(mockToken));
-		vm.startPrank(team);
-        launchpad = Launchpad(factory.createLaunchpad(info));
+		MainLaunchpadInfo memory info = SampleData._getSampleInfo(address(mockToken));
+        bytes32 salt = factory.calculateSalt(team, info.name, address(info.token));
+        address launchPadAddress = factory.getLaunchpadAddress(salt, info, protocolFee, treasury, team, address(factory));
 
-		mockToken.approve(address(launchpad), type(uint256).max);
-		launchpad.initialize();
+		vm.startPrank(team);
+        mockToken.approve(launchPadAddress, type(uint256).max);
+        launchpad = Launchpad(factory.createLaunchpad(info, salt));
 		vm.stopPrank();
 	}
 

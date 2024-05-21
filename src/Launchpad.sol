@@ -78,7 +78,6 @@ contract Launchpad {
     uint256 public wlBlockNumber;
     uint256 public wlMinBalance;
     bytes32 public wlRoot;
-    bool public initialized;
 
     IUniswapV2Factory uniswapFactory = IUniswapV2Factory(0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f);
     IUniswapV2Router02 uniswapRouter = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
@@ -107,6 +106,9 @@ contract Launchpad {
         protocolFeeAddress = _protocolFeeAddress;
         operator = _operator;
         factory = _factory;
+
+        token.safeTransferFrom(operator, address(this), tokenHardCap);
+        assert(token.balanceOf(address(this)) >= tokenHardCap);
     }
 
     // Contract functions
@@ -132,11 +134,6 @@ contract Launchpad {
 
     // *** ONLY OPERATOR SETTERS *** //
     // only authorized actors should be able to modify these parameters so we use `onlyOperator`
-    function initialize() external onlyOperator {
-        token.safeTransferFrom(msg.sender, address(this), tokenHardCap);
-
-        initialized = true;
-    }
 
     function transferOperatorOwnership(address newOperator) external onlyOperator {
 	    operator = newOperator;

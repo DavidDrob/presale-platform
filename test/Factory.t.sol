@@ -11,7 +11,6 @@ contract LaunchpadFactoryTest is Test {
 	address team = makeAddr("team");
 	address treasury = makeAddr("treasury");
 	uint256 protocolFee = 1000; // 10% in BP
-    address alice = makeAddr("alice");
 	ERC20Mock mockToken;
     LaunchpadFactory factory;
 
@@ -23,12 +22,21 @@ contract LaunchpadFactoryTest is Test {
     }
 
     function test_deployLaunchpad() public {
+        // calculate address via CREATE2
         MainLaunchpadInfo memory info = SampleData._getSampleInfo(address(mockToken));
+        bytes32 salt = factory.calculateSalt(team, info.name, address(info.token));
+        address launchPadAddress = factory.getLaunchpadAddress(salt, info, protocolFee, treasury, team, address(factory));
 
-        vm.prank(alice);
-        Launchpad launchpad = Launchpad(factory.createLaunchpad(info));
+        vm.startPrank(team);
+        mockToken.approve(launchPadAddress, info.tokenHardCap);
+        Launchpad launchpad = Launchpad(factory.createLaunchpad(info, salt));
+        vm.stopPrank();
 
-        assertEq(launchpad.operator(), alice);
+        assertEq(launchpad.operator(), team);
         assertEq(launchpad.name(), info.name);
+        assertEq(launchPadAddress, address(launchpad));
+
+        uint256 launchpadBalance = info.token.balanceOf(address(launchpad));
+        assertEq(launchpadBalance, info.tokenHardCap);
     }
 }
