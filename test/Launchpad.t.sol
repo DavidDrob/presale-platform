@@ -4,42 +4,33 @@ import "forge-std/Test.sol";
 import "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
 import "src/Launchpad.sol";
+import "src/Factory.sol";
 import "./utils/UniswapV2Library.sol";
+import "./utils/SampleData.sol";
 
 contract LaunchPadTest is Test {
-	address factory = makeAddr("factory");
 	address team = makeAddr("team");
 	address treasury = makeAddr("treasury");
-	uint256 protocolFee = 100; // 1% in BP
+	uint256 protocolFee = 1000; // 1% in BP
 
 	ERC20Mock mockToken;
 	Launchpad launchpad;
+    LaunchpadFactory factory;
 
 	function setUp() public {
-		mockToken = new ERC20Mock();
-		mockToken.mint(team, 100_000e18);
+        factory = new LaunchpadFactory(protocolFee, treasury);
+
+        mockToken = new ERC20Mock();
+        mockToken.mint(team, 100_000e18);
 
 		// skip, so block.timestamp doesn't underflow in some tests
 		skip(11 days);
 
-		MainLaunchpadInfo memory info = MainLaunchpadInfo({
-			name: "Sample Presale",
-			token: IERC20(address(mockToken)),
-			ethPricePerToken: 0.1 ether,
-			decimals: 1 ether,
-			tokenHardCap: 1000 ether,
-			minTokenBuy: 0,
-			maxTokenBuy: type(uint256).max,
-
-			startDate: block.timestamp + 2 days,
-			endDate: block.timestamp + 7 days,
-			releaseDelay: 1 days,
-			vestingDuration: 7 days
-		});
-
-		// TODO: use CREATE2 to get a predeterministic address to prevent an extra call
+		// TODO: use CREATE2 to get a predeterministic address to prevent an extra call (initialize)
+        MainLaunchpadInfo memory info = SampleData._getSampleInfo(address(mockToken));
 		vm.startPrank(team);
-		launchpad = new Launchpad(info, protocolFee, treasury, team, factory);
+        launchpad = Launchpad(factory.createLaunchpad(info));
+
 		mockToken.approve(address(launchpad), type(uint256).max);
 		launchpad.initialize();
 		vm.stopPrank();
