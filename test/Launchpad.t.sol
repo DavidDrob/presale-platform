@@ -128,30 +128,34 @@ contract LaunchPadTest is Test {
 		launchpad.buyTokens{value: _amount}(emptyBytes);
 	}
 
-	function test_createLP() public {
-		address alice = makeAddr("alice");
-		vm.deal(alice, type(uint256).max);
+	function test_createLP(uint256 _offset) public {
+        vm.assume(_offset >= 1e18 && _offset < 500e18); // the higher the offset, the higher new price will be
 
-		uint ethIn = 5 ether;
-		// TODO: transform getAmountOut to get a min amountIn to keep the price above
-		// the fixed price in Launchpad.
-		uint tokenIn = (ethIn / (1e18 / launchpad.ethPricePerToken()) * 2);
+        address alice = makeAddr("alice");
+        vm.deal(alice, type(uint256).max);
 
-		skip(2 days);
+        skip(2 days);
 
-		bytes32[] memory emptyBytes;
-		vm.prank(alice);
-		launchpad.buyTokens{value: ethIn}(emptyBytes);
+        // alice buys all tokens
+        bytes32[] memory emptyBytes;
+        launchpad.buyTokens{value: 100e18}(emptyBytes);
 
-		skip(5 days);
+        vm.prank(alice);
+        vm.expectRevert("hardcap overflow");
+        launchpad.buyTokens{value: 1e18}(emptyBytes);
 
-		vm.startPrank(team);
-		address pool = launchpad.createLp(tokenIn);
-		vm.stopPrank();
 
-		assertFalse(pool == address(0));
+        skip(6 days);
 
-		uint newEthpricePerToken = UniswapV2Library.getAmountOut(1 ether, ethIn, tokenIn);
-		assertGt(newEthpricePerToken, launchpad.ethPricePerToken());
+        uint ethInAfterFee = ((100e18 * (10_000 - protocolFee)) / 10_000);
+        uint tokenIn = ((ethInAfterFee * launchpad.decimals()) / launchpad.ethPricePerToken()) - _offset;
+
+        vm.prank(team);
+        address pool = launchpad.createLp(tokenIn);
+
+        assertFalse(pool == address(0));
+
+        uint newEthpricePerToken = UniswapV2Library.quote(1 ether, tokenIn, ethInAfterFee);
+        assertGt(newEthpricePerToken, launchpad.ethPricePerToken());
 	}
 }

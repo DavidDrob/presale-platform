@@ -195,13 +195,15 @@ contract Launchpad {
     function createLp(uint tokenIn) external onlyOperator returns (address) {
         require(isEnded(), "presale didn't end yet");
 
-        token.safeTransferFrom(operator, address(this), tokenIn);
-        token.approve(address(uniswapRouter), tokenIn);
-
         address pool = uniswapFactory.createPair(WETH, address(token));
 
-        uint ethIn = (totalPurchasedAmount * ethPricePerToken) / decimals; // prevent donation attack
-        require (tokenIn < ethIn, "price is below ethPricePerToken");
+        // prevent donation attack by not using `address(this).balance`
+        uint ethIn = (totalPurchasedAmount * ethPricePerToken) / decimals; 
+        uint ethInAfterFee = ((ethIn * (10_000 - protocolFee)) / 10_000);
+        require(tokenIn < ((ethInAfterFee * decimals) / ethPricePerToken), "price is below ethPricePerToken");
+
+        token.safeTransferFrom(operator, address(this), tokenIn);
+        token.approve(address(uniswapRouter), tokenIn);
 
         // TODO: add slippage
         uniswapRouter.addLiquidityETH{value: ethIn}(address(token), tokenIn, 0, 0, operator, block.timestamp);
@@ -231,7 +233,7 @@ contract Launchpad {
         uint256 tokenAmount = ethToToken(msg.value); // protocol fee is accounted in `ethToToken` already
 
     	// ensure the amount doesn't overflow the hardcap
-        require(totalPurchasedAmount + tokenAmount < tokenHardCap);
+        require(totalPurchasedAmount + tokenAmount <= tokenHardCap, "hardcap overflow");
 
     	// ensure amount is in allowed range 
         require(minTokenBuy <= tokenAmount &&
