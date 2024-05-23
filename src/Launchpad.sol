@@ -194,6 +194,7 @@ contract Launchpad {
 
     function createLp(uint tokenIn) external onlyOperator returns (address) {
         require(isEnded(), "presale didn't end yet");
+        require(block.timestamp < endDate + releaseDelay, "too late to create LP");
 
         address pool = uniswapFactory.createPair(WETH, address(token));
 

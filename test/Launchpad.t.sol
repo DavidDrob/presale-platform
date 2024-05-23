@@ -128,6 +128,21 @@ contract LaunchPadTest is Test {
 		launchpad.buyTokens{value: _amount}(emptyBytes);
 	}
 
+    function test_cantCreateLpBeforePresaleEnd() public {
+		assertEq(launchpad.isStarted(), false);
+        skip(2 days);
+		assertEq(launchpad.isStarted(), true);
+
+        vm.prank(team);
+        vm.expectRevert("presale didn't end yet");
+        launchpad.createLp(0);
+
+        skip(5 days + 1 days); // presale end + release delay
+        vm.prank(team);
+        vm.expectRevert("too late to create LP");
+        launchpad.createLp(0);
+    }
+
 	function test_createLP(uint256 _offset) public {
         vm.assume(_offset >= 1e18 && _offset < 500e18); // the higher the offset, the higher new price will be
 
