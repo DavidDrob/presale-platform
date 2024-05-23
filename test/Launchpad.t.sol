@@ -137,10 +137,78 @@ contract LaunchPadTest is Test {
         vm.expectRevert("presale didn't end yet");
         launchpad.createLp(0);
 
-        skip(5 days + 1 days); // presale end + release delay
+        skip(5 days + 1 days + 1); // presale end + release delay + some time
         vm.prank(team);
         vm.expectRevert("too late to create LP");
         launchpad.createLp(0);
+    }
+
+    function test_terminateLiquidity() public {
+        uint256 depositAmount = 10e18;
+
+        skip(2 days);
+        address alice = makeAddr("alice");
+        vm.deal(alice, type(uint256).max);
+        bytes32[] memory emptyBytes;
+        vm.prank(alice);
+        launchpad.buyTokens{value: depositAmount}(emptyBytes);
+
+        vm.prank(team);
+        vm.expectRevert("presale didn't end yet");
+        launchpad.terminateLiquidity();
+
+        skip(5 days); // presale end 
+        vm.expectRevert("only operator can terminate before releaseDelay");
+        launchpad.terminateLiquidity();
+
+        vm.prank(alice);
+        vm.expectRevert("liquidity is not terminated");
+        launchpad.withdrawEth();
+
+        skip(1 days + 1); // presale end + release delay, anyone can terminate
+        launchpad.terminateLiquidity();
+
+        assertTrue(launchpad.terminated());
+
+        uint256 balanceBefore = alice.balance;
+        vm.prank(alice);
+        launchpad.withdrawEth();
+        assertEq(balanceBefore + depositAmount, alice.balance);
+    }
+
+    function test_cantTerminateLiquidityWhenLpExists() public {
+        address alice = makeAddr("alice");
+        vm.deal(alice, type(uint256).max);
+
+        skip(2 days);
+
+        // alice buys all tokens
+        bytes32[] memory emptyBytes;
+        vm.prank(alice);
+        launchpad.buyTokens{value: 100e18}(emptyBytes);
+
+        uint ethInAfterFee = ((100e18 * (10_000 - protocolFee)) / 10_000);
+        uint tokenIn = ((ethInAfterFee * launchpad.decimals()) / launchpad.ethPricePerToken()) - 10e18;
+
+        skip(5 days); // presale end, only operator can terminate
+
+        vm.startPrank(team);
+        launchpad.createLp(tokenIn);
+
+        vm.expectRevert("LP exists");
+        launchpad.terminateLiquidity();
+    }
+
+    function test_terminateLiquidityOperator() public {
+        skip(2 days);
+
+        vm.prank(team);
+        vm.expectRevert("presale didn't end yet");
+        launchpad.terminateLiquidity();
+
+        skip(5 days); // presale end 
+        vm.expectRevert("only operator can terminate before releaseDelay");
+        launchpad.terminateLiquidity();
     }
 
 	function test_createLP(uint256 _offset) public {
@@ -153,6 +221,7 @@ contract LaunchPadTest is Test {
 
         // alice buys all tokens
         bytes32[] memory emptyBytes;
+        vm.prank(alice);
         launchpad.buyTokens{value: 100e18}(emptyBytes);
 
         vm.prank(alice);

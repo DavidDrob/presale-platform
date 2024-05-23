@@ -78,6 +78,8 @@ contract Launchpad {
     uint256 public wlBlockNumber;
     uint256 public wlMinBalance;
     bytes32 public wlRoot;
+    bool public terminated;
+    address public liquidityPoolAddress;
 
     IUniswapV2Factory uniswapFactory = IUniswapV2Factory(0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f);
     IUniswapV2Router02 uniswapRouter = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
@@ -194,7 +196,7 @@ contract Launchpad {
 
     function createLp(uint tokenIn) external onlyOperator returns (address) {
         require(isEnded(), "presale didn't end yet");
-        require(block.timestamp < endDate + releaseDelay, "too late to create LP");
+        require(block.timestamp <= endDate + releaseDelay, "too late to create LP");
 
         address pool = uniswapFactory.createPair(WETH, address(token));
 
@@ -209,10 +211,26 @@ contract Launchpad {
         // TODO: add slippage
         uniswapRouter.addLiquidityETH{value: ethIn}(address(token), tokenIn, 0, 0, operator, block.timestamp);
 
+        liquidityPoolAddress = pool;
+
         return pool;
     }
     // *** ONLY OPERATOR SETTERS *** //
 
+
+    // operator can terminate liquidity before releaseDelay
+    // anyone can terminate liquidity after releaseDelay (project was abandoned by operator)
+    // reverts before presale end or if LP has already been created
+    function terminateLiquidity() external {
+        require(isEnded(), "presale didn't end yet");
+        require(liquidityPoolAddress == address(0), "LP exists");
+        
+        if (block.timestamp > endDate + releaseDelay || msg.sender == operator) {
+            terminated = true;
+        } else {
+            revert("only operator can terminate before releaseDelay");
+        }
+    }
 
     // ethPricePerToken and ethAmount both have 18 decimals
     // take decimals into account when using something other then ETH in the future.
@@ -221,6 +239,10 @@ contract Launchpad {
     function ethToToken(uint256 ethAmount) public view returns (uint256) {
         // TODO: add fee calculation
         return (ethAmount * decimals) / ethPricePerToken;
+    }
+
+    function tokenToEth(uint256 tokenAmount) public view returns (uint256) {
+        return (tokenAmount * ethPricePerToken) / decimals;
     }
 
     // NOTE: make proof optional, by making `buyTokens` internal and adding
@@ -267,11 +289,13 @@ contract Launchpad {
     // return ETH to users if the operator chooses not to continue vesting
     // not sure if `nonReentrant` is necessary, but keep it for now
     function withdrawEth() external nonReentrant {
-        require(isEnded());
+        require(terminated, "liquidity is not terminated");
+    
+        uint256 transferAmount = tokenToEth(purchasedAmount[msg.sender]);
+        purchasedAmount[msg.sender] = 0;
 
-        // transfer purchasedAmount[msg.sender]
-
-        // update purchasedAmount[msg.sender]
+        (bool sent, ) = (msg.sender).call{value: transferAmount}("");
+        require(sent, "transfer failed");
     }
 
     // return tokens if the operator chooses not to continue vesting
