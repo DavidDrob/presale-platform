@@ -1,6 +1,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
+import "forge-std/StdMath.sol"; 
 import "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
 import "src/Launchpad.sol";
@@ -9,6 +10,8 @@ import "./utils/UniswapV2Library.sol";
 import "./utils/SampleData.sol";
 
 contract LaunchPadTest is Test {
+    using stdMath for uint;
+
 	address team = makeAddr("team");
 	address treasury = makeAddr("treasury");
 	uint256 protocolFee = 1000; // 1% in BP
@@ -242,4 +245,29 @@ contract LaunchPadTest is Test {
         uint newEthpricePerToken = UniswapV2Library.quote(1 ether, tokenIn, ethInAfterFee);
         assertGt(newEthpricePerToken, launchpad.ethPricePerToken());
 	}
+
+	function test_factoryReceivesFees(uint256 _buyAmount) public {
+        vm.assume(_buyAmount >= 1e18 && _buyAmount <= 100e18);
+
+        address alice = makeAddr("alice");
+        vm.deal(alice, type(uint256).max);
+
+        skip(2 days);
+
+        bytes32[] memory emptyBytes;
+        vm.prank(alice);
+        launchpad.buyTokens{value: _buyAmount}(emptyBytes);
+
+        skip(6 days);
+
+        uint256 factoryBalanceBefore = address(factory).balance;
+
+        uint256 ethInAfterFee = ((_buyAmount * (10_000 - protocolFee)) / 10_000);
+        uint256 tokenIn = ((ethInAfterFee * launchpad.decimals()) / launchpad.ethPricePerToken()) - 1e18;
+
+        vm.prank(team);
+        launchpad.createLp(tokenIn);
+
+        assertGe(address(factory).balance, factoryBalanceBefore + (_buyAmount - ethInAfterFee));
+    }
 }

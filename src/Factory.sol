@@ -37,4 +37,6 @@ contract LaunchpadFactory {
     {
         return keccak256(abi.encode(operator, name, token));
     }
+
+    receive() external payable {}
 }
