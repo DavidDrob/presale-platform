@@ -277,4 +277,72 @@ contract LaunchPadTest is Test {
 
         assertGe(address(factory).balance, factoryBalanceBefore + (_buyAmount - ethInAfterFee));
     }
+
+	function test_linearVestingPeriods() public {
+        // Arange
+        address alice = makeAddr("alice");
+        address bob = makeAddr("bob");
+        vm.deal(alice, type(uint256).max);
+        vm.deal(bob, type(uint256).max);
+
+        skip(2 days);
+
+        bytes32[] memory emptyBytes;
+        vm.prank(alice);
+        launchpad.buyTokens{value: 20e18}(emptyBytes);
+        vm.prank(bob);
+        launchpad.buyTokens{value: 20e18}(emptyBytes);
+
+        skip(5 days);
+
+        uint256 ethInAfterFee = ((40e18 * (10_000 - protocolFee)) / 10_000);
+        uint256 tokenIn = ((ethInAfterFee * launchpad.decimals()) / launchpad.ethPricePerToken()) - 1e18;
+
+        uint256 dailyMax = 57.14e18; // TODO: calculate the value
+
+        vm.prank(team);
+        launchpad.createLp(tokenIn);
+
+        // Act, Assert
+        vm.startPrank(alice);
+        vm.expectRevert("Vesting not started");
+        launchpad.claimTokens(1e18);
+
+        skip(1 days);
+
+        vm.expectRevert("Amount can not be zero");
+        launchpad.claimTokens(0);
+
+        uint256 purchasedAmountAlice = launchpad.purchasedAmount(alice);
+        vm.expectRevert("Trying to claim more then allowed");
+        launchpad.claimTokens(purchasedAmountAlice + 1);
+
+        uint256 tokenAmount = 20e18;
+        launchpad.claimTokens(tokenAmount);
+        vm.stopPrank();
+        assertEq(launchpad.totalClaimedAmount(), tokenAmount);
+
+        vm.prank(bob);
+        vm.expectRevert("Cap for current period has been reached");
+        launchpad.claimTokens((dailyMax - tokenAmount) + 1e18);
+
+        skip(1 days);
+
+        vm.prank(bob);
+        launchpad.claimTokens((dailyMax * 2) - tokenAmount);
+
+        skip(10 days); // vesting is over
+
+        uint256 bobBefore = mockToken.balanceOf(bob);
+        tokenAmount = launchpad.claimableAmount(bob);
+        vm.prank(bob);
+        launchpad.claimTokens(tokenAmount);
+        assertEq(mockToken.balanceOf(bob), bobBefore + tokenAmount);
+
+        uint256 aliceBefore = mockToken.balanceOf(alice);
+        tokenAmount = launchpad.claimableAmount(alice);
+        vm.prank(alice);
+        launchpad.claimTokens(tokenAmount);
+        assertEq(mockToken.balanceOf(alice), aliceBefore + tokenAmount);
+    }
 }

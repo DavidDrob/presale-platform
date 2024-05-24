@@ -75,11 +75,13 @@ contract Launchpad {
     mapping(address => uint256) public purchasedAmount;
     mapping(address => uint256) public claimedAmount;
     uint256 public totalPurchasedAmount;
+    uint256 public totalClaimedAmount;
     uint256 public wlBlockNumber;
     uint256 public wlMinBalance;
     bytes32 public wlRoot;
     bool public terminated;
     address public liquidityPoolAddress;
+    uint256 public releasePerDay;
 
     IUniswapV2Factory uniswapFactory = IUniswapV2Factory(0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f);
     IUniswapV2Router02 uniswapRouter = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
@@ -129,9 +131,8 @@ contract Launchpad {
     }
 
     function isClaimable() public view returns (bool) {
-        return false;
-        // TODO: check if operator provided liquidity
-        return block.timestamp >= endDate + releaseDelay;
+        return (block.timestamp >= endDate + releaseDelay
+               && !terminated);
     }
 
     // *** ONLY OPERATOR SETTERS *** //
@@ -212,6 +213,7 @@ contract Launchpad {
         uniswapRouter.addLiquidityETH{value: ethInAfterFee}(address(token), tokenIn, 0, 0, operator, block.timestamp);
 
         liquidityPoolAddress = pool;
+        releasePerDay = (totalPurchasedAmount / (vestingDuration / 1 days));
 
         (bool sent, ) = (factory).call{value: (ethIn - ethInAfterFee)}("");
         assert(sent);
@@ -270,22 +272,30 @@ contract Launchpad {
         totalPurchasedAmount += tokenAmount;
     }
 
-    function claimableAmount(address _address) external view returns (uint256) {
+    function claimableAmount(address _address) public view returns (uint256) {
         // TODO: calculate max amount for the current vesting timeframe
         // return Math.min(maxAmount, purchaseAmount-claimedAmount);
 
         return purchasedAmount[_address] - claimedAmount[_address];
     }
 
-    function claimTokens() external {
-        require(isClaimable());
-        
-        // IDEA: figure out how to calculate an amount so that
-        // one user doesn't claim all available tokens for a vesting timeframe at once 
-        // not sure if this is necessary though
+    // IDEA: figure out how to calculate an amount so that
+    // one user doesn't claim all available tokens for a vesting timeframe at once 
+    // not sure if this is necessary though
+    function claimTokens(uint256 _amount) external {
+        require(isClaimable(), "Vesting not started");
+        require(_amount > 0, "Amount can not be zero");
+        require(_amount <= claimableAmount(msg.sender), "Trying to claim more then allowed");
 
-        // use safeTranfer because the token could be "weird" (ERC777, missing return on transfer, ...)
-        // https://github.com/d-xo/weird-erc20
+        uint256 daysSinceVestingStart = ((block.timestamp - (endDate + releaseDelay)) / 1 days) + 1; // rounds down automatically
+        uint256 availableTokens = ((releasePerDay * daysSinceVestingStart) - totalClaimedAmount);
+
+        require(_amount <= availableTokens, "Cap for current period has been reached");
+
+        claimedAmount[msg.sender] += _amount;
+        totalClaimedAmount += _amount;
+        
+        token.safeTransfer(msg.sender, _amount);
     }
 
     
