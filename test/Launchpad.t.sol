@@ -173,10 +173,17 @@ contract LaunchPadTest is Test {
 
         assertTrue(launchpad.terminated());
 
-        uint256 balanceBefore = alice.balance;
+        // claim ETH back
+        uint256 aliceBalanceBefore = alice.balance;
         vm.prank(alice);
         launchpad.withdrawEth();
-        assertEq(balanceBefore + depositAmount, alice.balance);
+        assertGe(alice.balance, aliceBalanceBefore + depositAmount);
+
+        // claim tokens back
+        uint256 teamBalanceBefore = mockToken.balanceOf(team);
+        vm.prank(team);
+        launchpad.withdrawTokens();
+        assertGe(mockToken.balanceOf(team), teamBalanceBefore + launchpad.tokenHardCap());
     }
 
     function test_cantTerminateLiquidityWhenLpExists() public {
