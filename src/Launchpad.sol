@@ -3,6 +3,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import "./Errors.sol";
+
 import "./interfaces/IUniswapV2Router02.sol";
 import "./interfaces/IUniswapV2Factory.sol";
 
@@ -102,9 +104,6 @@ contract Launchpad {
         releaseDelay = _info.releaseDelay; // e.g. 1 days (86400)
         vestingDuration = _info.vestingDuration; 
 
-        // if releaseDelay was after vestingDuration
-        // it could cause problems calculating the claimAmount during vesting later
-        require(vestingDuration >= releaseDelay, "Vesting starts after releaseDelay"); 
 
         protocolFee = _protocolFee;
         protocolFeeAddress = _protocolFeeAddress;
@@ -144,8 +143,8 @@ contract Launchpad {
 
     // only allow updating startDate before the pre-sale starts
     function updateStartDate(uint _newStartDate) external onlyOperator {
-        require(!isStarted(), "Cannot change start date when the pre-sale already started");
-        require(_newStartDate < endDate, "Cannot start before the end");
+        if (isStarted()) revert PresaleAlreadyStarted();
+        if (_newStartDate >= endDate) revert InvalidEndDate();
 
         startDate = _newStartDate;
     }
@@ -153,8 +152,8 @@ contract Launchpad {
     // only allow updating endDate before the vesting starts
     // otherwise tokens could be claimed before the pre-sale ends
     function updateEndDate(uint _newEndDate) external onlyOperator {
-        require(!isClaimable(), "Cannot change end date after vesting started");
-        require(startDate < _newEndDate, "Cannot end before the start");
+        if (isClaimable()) revert InvalidEndDate();
+        if (_newEndDate <= startDate) revert InvalidEndDate();
 
         endDate = _newEndDate;
     }
@@ -180,7 +179,7 @@ contract Launchpad {
     // only allow updating vestingDuration before the vesting starts
     // otherwise it could mess up the calculation of the claimable amounts in a vesting timeframe
     function setVestingDuration(uint256 _vestingDuration) external onlyOperator {
-        require(!isClaimable(), "Cannot change vesting duration after vesting started");
+        if (isClaimable()) revert InvalidVestingDuration();
 
         vestingDuration = _vestingDuration;
     }
@@ -196,15 +195,15 @@ contract Launchpad {
     }
 
     function createLp(uint tokenIn) external onlyOperator returns (address) {
-        require(isEnded(), "presale didn't end yet");
-        require(block.timestamp <= endDate + releaseDelay, "too late to create LP");
+        if (!isEnded()) revert PresaleNotEnded();
+        if (block.timestamp > endDate + releaseDelay) revert ReleaseDelayPassed();
 
         address pool = uniswapFactory.createPair(WETH, address(token));
 
         // prevent donation attack by not using `address(this).balance`
         uint ethIn = (totalPurchasedAmount * ethPricePerToken) / decimals; 
         uint ethInAfterFee = ((ethIn * (10_000 - protocolFee)) / 10_000);
-        require(tokenIn < ((ethInAfterFee * decimals) / ethPricePerToken), "price is below ethPricePerToken");
+        if (tokenIn >= ((ethInAfterFee * decimals) / ethPricePerToken)) revert PriceTooLow();
 
         token.safeTransferFrom(operator, address(this), tokenIn);
         token.approve(address(uniswapRouter), tokenIn);
@@ -227,13 +226,13 @@ contract Launchpad {
     // anyone can terminate liquidity after releaseDelay (project was abandoned by operator)
     // reverts before presale end or if LP has already been created
     function terminateLiquidity() external {
-        require(isEnded(), "presale didn't end yet");
-        require(liquidityPoolAddress == address(0), "LP exists");
+        if (!isEnded()) revert PresaleNotEnded();
+        if (liquidityPoolAddress != address(0)) revert LPExists();
         
         if (block.timestamp > endDate + releaseDelay || msg.sender == operator) {
             terminated = true;
         } else {
-            revert("only operator can terminate before releaseDelay");
+            revert OnlyOperator();
         }
     }
 
@@ -255,17 +254,17 @@ contract Launchpad {
     //
     // use `nonReentrant` so the user can't abuse msg.value to purchase more then they deposit
     function buyTokens(bytes32[] calldata proof) external payable nonReentrant {
-        require(isStarted(), "presale not started");
-        require(!isEnded(), "presale ended");
+        if (!isStarted()) revert PresaleNotStarted();
+        if (isEnded()) revert PresaleEnded();
 
         uint256 tokenAmount = ethToToken(msg.value); // protocol fee is accounted in `ethToToken` already
 
     	// ensure the amount doesn't overflow the hardcap
-        require(totalPurchasedAmount + tokenAmount <= tokenHardCap, "hardcap overflow");
+        if(totalPurchasedAmount + tokenAmount > tokenHardCap) revert HardCapOverflow();
 
     	// ensure amount is in allowed range 
-        require(minTokenBuy <= tokenAmount &&
-                tokenAmount <= maxTokenBuy);
+        if (tokenAmount < minTokenBuy) revert AmountTooLow();
+        if (tokenAmount > maxTokenBuy) revert AmountTooHigh();
 
         // update `purchasedAmount` and `totalPurchasedAmount`
         purchasedAmount[msg.sender] = tokenAmount;
@@ -273,24 +272,28 @@ contract Launchpad {
     }
 
     function claimableAmount(address _address) public view returns (uint256) {
+        return purchasedAmount[_address] - claimedAmount[_address];
+    }
+
+    function claimableAmountNow(address _address) public view returns (uint256) {
         // TODO: calculate max amount for the current vesting timeframe
         // return Math.min(maxAmount, purchaseAmount-claimedAmount);
 
-        return purchasedAmount[_address] - claimedAmount[_address];
+        return 0;
     }
 
     // IDEA: figure out how to calculate an amount so that
     // one user doesn't claim all available tokens for a vesting timeframe at once 
     // not sure if this is necessary though
     function claimTokens(uint256 _amount) external {
-        require(isClaimable(), "Vesting not started");
-        require(_amount > 0, "Amount can not be zero");
-        require(_amount <= claimableAmount(msg.sender), "Trying to claim more then allowed");
+        if (!isClaimable()) revert NotClaimable();
+        if (_amount == 0) revert AmountZero();
+        if (_amount > claimableAmount(msg.sender)) revert ExceedClaimableAmount();
 
         uint256 daysSinceVestingStart = ((block.timestamp - (endDate + releaseDelay)) / 1 days) + 1; // rounds down automatically
         uint256 availableTokens = ((releasePerDay * daysSinceVestingStart) - totalClaimedAmount);
 
-        require(_amount <= availableTokens, "Cap for current period has been reached");
+        if (_amount > availableTokens) revert CapForPeriodReached();
 
         claimedAmount[msg.sender] += _amount;
         totalClaimedAmount += _amount;
@@ -302,19 +305,18 @@ contract Launchpad {
     // return ETH to users if the operator chooses not to continue vesting
     // not sure if `nonReentrant` is necessary, but keep it for now
     function withdrawEth() external nonReentrant {
-        require(terminated, "liquidity is not terminated");
+        if (!terminated) revert LiquidityNotTerminated();
     
         uint256 transferAmount = tokenToEth(purchasedAmount[msg.sender]);
         purchasedAmount[msg.sender] = 0;
 
         (bool sent, ) = (msg.sender).call{value: transferAmount}("");
-        require(sent, "transfer failed");
+        if (!sent) revert TransferFailed();
     }
 
     // return tokens if the operator chooses not to continue vesting
     function withdrawTokens() external onlyOperator {
-        require(isEnded());
-        require(terminated, "liquidity is not terminated");
+        if (!terminated) revert LiquidityNotTerminated();
     
         token.safeTransfer(operator, tokenHardCap);
     }

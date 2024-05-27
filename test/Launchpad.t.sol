@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
 import "src/Launchpad.sol";
 import "src/Factory.sol";
+import "src/Errors.sol";
 import "./utils/UniswapV2Library.sol";
 import "./utils/SampleData.sol";
 
@@ -134,12 +135,12 @@ contract LaunchPadTest is Test {
 		assertEq(launchpad.isStarted(), true);
 
         vm.prank(team);
-        vm.expectRevert("presale didn't end yet");
+        vm.expectRevert(PresaleNotEnded.selector);
         launchpad.createLp(0);
 
         skip(5 days + 1 days + 1); // presale end + release delay + some time
         vm.prank(team);
-        vm.expectRevert("too late to create LP");
+        vm.expectRevert(ReleaseDelayPassed.selector);
         launchpad.createLp(0);
     }
 
@@ -154,15 +155,15 @@ contract LaunchPadTest is Test {
         launchpad.buyTokens{value: depositAmount}(emptyBytes);
 
         vm.prank(team);
-        vm.expectRevert("presale didn't end yet");
+        vm.expectRevert(PresaleNotEnded.selector);
         launchpad.terminateLiquidity();
 
         skip(5 days); // presale end 
-        vm.expectRevert("only operator can terminate before releaseDelay");
+        vm.expectRevert(OnlyOperator.selector);
         launchpad.terminateLiquidity();
 
         vm.prank(alice);
-        vm.expectRevert("liquidity is not terminated");
+        vm.expectRevert(LiquidityNotTerminated.selector);
         launchpad.withdrawEth();
 
         skip(1 days + 1); // presale end + release delay, anyone can terminate
@@ -202,7 +203,7 @@ contract LaunchPadTest is Test {
         vm.startPrank(team);
         launchpad.createLp(tokenIn);
 
-        vm.expectRevert("LP exists");
+        vm.expectRevert(LPExists.selector);
         launchpad.terminateLiquidity();
     }
 
@@ -210,11 +211,11 @@ contract LaunchPadTest is Test {
         skip(2 days);
 
         vm.prank(team);
-        vm.expectRevert("presale didn't end yet");
+        vm.expectRevert(PresaleNotEnded.selector);
         launchpad.terminateLiquidity();
 
         skip(5 days); // presale end 
-        vm.expectRevert("only operator can terminate before releaseDelay");
+        vm.expectRevert(OnlyOperator.selector);
         launchpad.terminateLiquidity();
     }
 
@@ -232,7 +233,7 @@ contract LaunchPadTest is Test {
         launchpad.buyTokens{value: 100e18}(emptyBytes);
 
         vm.prank(alice);
-        vm.expectRevert("hardcap overflow");
+        vm.expectRevert(HardCapOverflow.selector);
         launchpad.buyTokens{value: 1e18}(emptyBytes);
 
 
@@ -302,16 +303,16 @@ contract LaunchPadTest is Test {
 
         // Act, Assert
         vm.startPrank(alice);
-        vm.expectRevert("Vesting not started");
+        vm.expectRevert(NotClaimable.selector);
         launchpad.claimTokens(1e18);
 
         skip(1 days);
 
-        vm.expectRevert("Amount can not be zero");
+        vm.expectRevert(AmountZero.selector);
         launchpad.claimTokens(0);
 
         uint256 purchasedAmountAlice = launchpad.purchasedAmount(alice);
-        vm.expectRevert("Trying to claim more then allowed");
+        vm.expectRevert(ExceedClaimableAmount.selector);
         launchpad.claimTokens(purchasedAmountAlice + 1);
 
         uint256 tokenAmount = 20e18;
@@ -320,7 +321,7 @@ contract LaunchPadTest is Test {
         assertEq(launchpad.totalClaimedAmount(), tokenAmount);
 
         vm.prank(bob);
-        vm.expectRevert("Cap for current period has been reached");
+        vm.expectRevert(CapForPeriodReached.selector);
         launchpad.claimTokens((dailyMax - tokenAmount) + 1e18);
 
         skip(1 days);
