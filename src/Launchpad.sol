@@ -321,7 +321,12 @@ contract Launchpad {
         token.safeTransfer(operator, tokenHardCap);
     }
 
-    function transferPurchasedOwnership(address _newOwner) external {
-        address x = _newOwner; // for compiler, implement later
+    function transferPurchasedOwnership(uint256 _amount, address _newOwner) external {
+        if (_amount == 0) revert AmountZero();
+        if (_amount > purchasedAmount[msg.sender]) revert ExceedBalance();
+        if (_amount + purchasedAmount[_newOwner] > maxTokenBuy) revert AmountTooHigh();
+
+        purchasedAmount[msg.sender] -= _amount;
+        purchasedAmount[_newOwner] += _amount;
     }
 }

@@ -129,6 +129,31 @@ contract LaunchPadTest is Test {
 		launchpad.buyTokens{value: _amount}(emptyBytes);
 	}
 
+    function test_transferOwnership() public {
+		address alice = makeAddr("alice");
+		address bob = makeAddr("bob");
+		vm.deal(alice, type(uint256).max);
+		bytes32[] memory emptyBytes;
+
+		skip(2 days);
+		vm.prank(alice);
+		launchpad.buyTokens{value: 20e18}(emptyBytes);
+        uint256 aliceBalance = launchpad.purchasedAmount(alice);
+
+        assertNotEq(launchpad.purchasedAmount(alice), 0);
+        assertEq(launchpad.purchasedAmount(bob), 0);
+
+        vm.prank(alice);
+        vm.expectRevert(ExceedBalance.selector);
+        launchpad.transferPurchasedOwnership(aliceBalance + 1, bob);
+
+        vm.prank(alice);
+        launchpad.transferPurchasedOwnership(aliceBalance, bob);
+
+        assertEq(launchpad.purchasedAmount(alice), 0);
+        assertEq(launchpad.purchasedAmount(bob), aliceBalance);
+    }
+
     function test_cantCreateLpBeforePresaleEnd() public {
 		assertEq(launchpad.isStarted(), false);
         skip(2 days);

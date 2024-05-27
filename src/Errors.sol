@@ -26,3 +26,4 @@ error PriceTooLow();
 error OnlyOperator();
 error HardCapOverflow();
 error TransferFailed();
+error ExceedBalance();
