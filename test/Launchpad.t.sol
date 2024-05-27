@@ -54,7 +54,6 @@ contract LaunchPadTest is Test {
 	}
 
 	function test_updateStartDate(uint _newDate) public {
-		vm.assume(_newDate > block.timestamp - 10 days);
 		vm.assume(_newDate < launchpad.endDate());
 
 		vm.prank(team);
@@ -101,9 +100,7 @@ contract LaunchPadTest is Test {
 
 	function test_buy(uint _amount) public {
 		vm.assume(_amount >= launchpad.ethPricePerToken()
-				  && _amount >= launchpad.minTokenBuy()
-				  && _amount <= launchpad.tokenHardCap() - launchpad.totalPurchasedAmount()
-		);
+               && _amount <= launchpad.tokenToEth(launchpad.tokenHardCap()));
 
 		address alice = makeAddr("alice");
 		vm.deal(alice, type(uint256).max);
@@ -112,7 +109,7 @@ contract LaunchPadTest is Test {
 		uint256 totalAmountBefore = launchpad.totalPurchasedAmount();
 
 		vm.prank(alice);
-		vm.expectRevert();
+		vm.expectRevert(); // TODO: add reason
 		launchpad.buyTokens{value: _amount}(emptyBytes);
 		
 		assertEq(launchpad.purchasedAmount(alice), 0);
