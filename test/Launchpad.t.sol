@@ -10,6 +10,7 @@ import "src/Factory.sol";
 import "src/Errors.sol";
 import "./utils/UniswapV2Library.sol";
 import "./utils/SampleData.sol";
+import {Merkle} from "./utils/Murky.sol";
 
 contract LaunchPadTest is Test {
     using stdMath for uint;
@@ -189,6 +190,39 @@ contract LaunchPadTest is Test {
 		vm.expectRevert();
 		launchpad.buyTokens{value: _amount}(emptyBytes);
 	}
+
+    function test_whitelist() public {
+		address alice = makeAddr("alice");
+		address bob = makeAddr("bob");
+		vm.deal(alice, type(uint256).max);
+		vm.deal(bob, type(uint256).max);
+
+        skip(2 days);
+
+        bytes32[] memory data = new bytes32[](2);
+        data[0] = keccak256(abi.encode(alice));
+        data[1] = keccak256(abi.encode(bob));
+
+        Merkle m = new Merkle();
+        bytes32 root = m.getRoot(data);
+
+        vm.expectEmit();
+        emit LaunchpadEvents.WhitelistUpdated(root);
+        vm.prank(team);
+        launchpad.updateWhitelist(root);
+
+        bytes32[] memory proof = m.getProof(data, 0);
+        vm.prank(alice);
+		launchpad.buyTokens{value: 20e18}(proof);
+
+        vm.prank(bob);
+        vm.expectRevert(NotWhitelisted.selector);
+		launchpad.buyTokens{value: 20e18}(proof);
+
+        proof = m.getProof(data, 1);
+        vm.prank(bob);
+		launchpad.buyTokens{value: 20e18}(proof);
+    }
 
     function test_transferOwnership() public {
 		address alice = makeAddr("alice");

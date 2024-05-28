@@ -7,6 +7,7 @@ error PresaleNotStarted();
 error PresaleNotEnded();
 error AmountTooLow();
 error AmountTooHigh();
+error NotWhitelisted();
 
 // pre-liquidity phase
 error ReleaseDelayPassed();

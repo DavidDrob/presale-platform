@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 import "./Errors.sol";
 
@@ -36,8 +37,7 @@ contract Launchpad is ReentrancyGuard {
     amount);
     event EthPricePerTokenUpdated(address indexed _token, uint256
     newEthPricePerToken);
-    event WhitelistUpdated(uint256 wlBlockNumber, uint256 wlMinBalance, bytes32
-    wlRoot);
+    event WhitelistUpdated(bytes32 wlRoot);
     event TokenHardCapUpdated(address indexed _token, uint256 newTokenHardCap);
     event OperatorTransferred(address indexed previousOperator, address indexed
     newOperator);
@@ -74,8 +74,6 @@ contract Launchpad is ReentrancyGuard {
     mapping(address => uint256) public claimedAmount;
     uint256 public totalPurchasedAmount;
     uint256 public totalClaimedAmount;
-    uint256 public wlBlockNumber;
-    uint256 public wlMinBalance;
     bytes32 public wlRoot;
     bool public terminated;
     address public liquidityPoolAddress;
@@ -160,11 +158,10 @@ contract Launchpad is ReentrancyGuard {
     }
 
 
-    function updateWhitelist(uint256 _wlBlockNumber, uint256 _wlMinBalance,
-    bytes32 _wlRoot) external onlyOperator {
-	    wlBlockNumber = _wlBlockNumber;
-	    wlMinBalance = _wlMinBalance;
+    function updateWhitelist(bytes32 _wlRoot) external onlyOperator {
 	    wlRoot = _wlRoot;
+
+        emit WhitelistUpdated(_wlRoot);
     }
 
     function increaseHardCap(uint256 _tokenHardCapIncrement) external onlyOperator {
@@ -263,6 +260,14 @@ contract Launchpad is ReentrancyGuard {
     function buyTokens(bytes32[] calldata proof) external payable nonReentrant {
         if (!isStarted()) revert PresaleNotStarted();
         if (isEnded()) revert PresaleEnded();
+
+        if (
+            wlRoot != bytes32(0) &&
+            !MerkleProof.verifyCalldata(
+                proof, wlRoot, keccak256((abi.encode(msg.sender)))
+        )) {
+            revert NotWhitelisted();
+        }
 
         uint256 tokenAmount = ethToToken(msg.value); // protocol fee is accounted in `ethToToken` already
 
