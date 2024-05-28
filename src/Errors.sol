@@ -17,12 +17,12 @@ error LiquidityNotTerminated();
 error NotClaimable();
 error ExceedClaimableAmount();
 error CapForPeriodReached();
+error ClaimingAlreadyStarted();
 
 // other
 error AmountZero();
 error InvalidEndDate();
 error InvalidReleaseDelay();
-error InvalidVestingDuration();
 error PriceTooLow();
 error OnlyOperator();
 error HardCapOverflow();

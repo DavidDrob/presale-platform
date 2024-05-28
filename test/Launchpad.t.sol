@@ -74,6 +74,50 @@ contract LaunchPadTest is Test {
 		assertEq(launchpad.endDate(), _newDate);
 	}
 
+	function test_updateEthPricePerToken(uint256 _amount) public {
+        vm.assume(_amount > 0);
+
+		vm.prank(team);
+		launchpad.updateEthPricePerToken(_amount);
+
+		assertEq(launchpad.ethPricePerToken(), _amount);
+
+        skip(launchpad.startDate());
+
+		vm.prank(team);
+        vm.expectRevert(PresaleAlreadyStarted.selector);
+		launchpad.updateEthPricePerToken(_amount);
+	}
+
+	function test_setVestingDuration() public {
+		vm.prank(team);
+		launchpad.setVestingDuration(8 days);
+
+		assertEq(launchpad.vestingDuration(), 8 days);
+
+        skip(launchpad.endDate() + launchpad.releaseDelay());
+
+		vm.prank(team);
+        vm.expectRevert(ClaimingAlreadyStarted.selector);
+		launchpad.setVestingDuration(7 days);
+	}
+
+	function test_transferOperatorOwnership() public {
+        address alice = makeAddr("alice");
+        address badActor = makeAddr("badActor");
+
+		vm.prank(team);
+		launchpad.transferOperatorOwnership(alice);
+
+		assertEq(launchpad.operator(), alice);
+
+		vm.prank(badActor);
+        vm.expectRevert(OnlyOperator.selector);
+		launchpad.transferOperatorOwnership(team);
+
+		assertNotEq(launchpad.operator(), team);
+    }
+
 	function test_onlyOperator() public {
 		string memory nameBefore = launchpad.name();
 

@@ -45,7 +45,7 @@ contract Launchpad is ReentrancyGuard {
 
     // Modifiers
     modifier onlyOperator() {
-        require(msg.sender == operator);
+        if (msg.sender != operator) revert OnlyOperator();
 
         _;
     }
@@ -177,14 +177,14 @@ contract Launchpad is ReentrancyGuard {
     // only allow updating vestingDuration before the vesting starts
     // otherwise it could mess up the calculation of the claimable amounts in a vesting timeframe
     function setVestingDuration(uint256 _vestingDuration) external onlyOperator {
-        if (isClaimable()) revert InvalidVestingDuration();
+        if (isClaimable()) revert ClaimingAlreadyStarted();
 
         vestingDuration = _vestingDuration;
     }
 
     function updateEthPricePerToken(uint256 _ethPricePerToken) external onlyOperator {
-        // consider allowing this only before the presale starts for now
-        // as it could complicate calculating the ratio of token/ETH for the LP
+        if (isStarted()) revert PresaleAlreadyStarted();
+
         ethPricePerToken = _ethPricePerToken;
     }
 
