@@ -136,7 +136,10 @@ contract Launchpad is ReentrancyGuard {
     // only authorized actors should be able to modify these parameters so we use `onlyOperator`
 
     function transferOperatorOwnership(address newOperator) external onlyOperator {
+        address previousOperator = operator;
 	    operator = newOperator;
+
+        emit OperatorTransferred(previousOperator, newOperator);
     }
 
     // only allow updating startDate before the pre-sale starts
@@ -172,6 +175,8 @@ contract Launchpad is ReentrancyGuard {
         unchecked {
             tokenHardCap += _tokenHardCapIncrement;
         }
+
+        emit TokenHardCapUpdated(address(token), tokenHardCap);
     }
 
     // only allow updating vestingDuration before the vesting starts
@@ -180,12 +185,16 @@ contract Launchpad is ReentrancyGuard {
         if (isClaimable()) revert ClaimingAlreadyStarted();
 
         vestingDuration = _vestingDuration;
+
+        emit VestingDurationUpdated(_vestingDuration);
     }
 
     function updateEthPricePerToken(uint256 _ethPricePerToken) external onlyOperator {
         if (isStarted()) revert PresaleAlreadyStarted();
 
         ethPricePerToken = _ethPricePerToken;
+
+        emit EthPricePerTokenUpdated(address(token), _ethPricePerToken);
     }
 
     function setName(string memory _name) external onlyOperator {
@@ -267,6 +276,8 @@ contract Launchpad is ReentrancyGuard {
         // update `purchasedAmount` and `totalPurchasedAmount`
         purchasedAmount[msg.sender] = tokenAmount;
         totalPurchasedAmount += tokenAmount;
+
+        emit TokensPurchased(address(token), msg.sender, tokenAmount);
     }
 
     function availableNow() public view returns (uint256) {
@@ -305,6 +316,8 @@ contract Launchpad is ReentrancyGuard {
         totalClaimedAmount += _amount;
         
         token.safeTransfer(msg.sender, _amount);
+
+        emit TokensClaimed(address(token), msg.sender, _amount);
     }
 
     

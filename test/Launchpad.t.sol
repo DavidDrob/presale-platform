@@ -5,6 +5,7 @@ import "forge-std/StdMath.sol";
 import "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
 import "src/Launchpad.sol";
+import "src/LaunchpadEvents.sol";
 import "src/Factory.sol";
 import "src/Errors.sol";
 import "./utils/UniswapV2Library.sol";
@@ -77,6 +78,9 @@ contract LaunchPadTest is Test {
 	function test_updateEthPricePerToken(uint256 _amount) public {
         vm.assume(_amount > 0);
 
+        vm.expectEmit();
+        emit LaunchpadEvents.EthPricePerTokenUpdated(address(mockToken), _amount);
+
 		vm.prank(team);
 		launchpad.updateEthPricePerToken(_amount);
 
@@ -90,6 +94,9 @@ contract LaunchPadTest is Test {
 	}
 
 	function test_setVestingDuration() public {
+        vm.expectEmit();
+        emit LaunchpadEvents.VestingDurationUpdated(8 days);
+
 		vm.prank(team);
 		launchpad.setVestingDuration(8 days);
 
@@ -105,6 +112,9 @@ contract LaunchPadTest is Test {
 	function test_transferOperatorOwnership() public {
         address alice = makeAddr("alice");
         address badActor = makeAddr("badActor");
+
+        vm.expectEmit();
+        emit LaunchpadEvents.OperatorTransferred(launchpad.operator(), alice);
 
 		vm.prank(team);
 		launchpad.transferOperatorOwnership(alice);
@@ -137,6 +147,9 @@ contract LaunchPadTest is Test {
 		vm.assume(_increase < 100_000 ether - 1_000 ether);
 		assertGe(mockToken.balanceOf(address(launchpad)), 1_000 ether);
 
+        vm.expectEmit();
+        emit LaunchpadEvents.TokenHardCapUpdated(address(mockToken), launchpad.tokenHardCap() + _increase);
+
 		vm.startPrank(team);
 		launchpad.increaseHardCap(_increase);
 
@@ -161,6 +174,10 @@ contract LaunchPadTest is Test {
 		assertEq(launchpad.totalPurchasedAmount(), 0);
 
 		skip(2 days);
+
+        vm.expectEmit();
+        emit LaunchpadEvents.TokensPurchased(address(mockToken), alice, launchpad.ethToToken(_amount));
+
 		vm.prank(alice);
 		launchpad.buyTokens{value: _amount}(emptyBytes);
 
@@ -385,6 +402,9 @@ contract LaunchPadTest is Test {
         launchpad.claimTokens(purchasedAmountAlice + 1);
 
         uint256 tokenAmount = 20e18;
+        vm.expectEmit();
+        emit LaunchpadEvents.TokensClaimed(address(mockToken), alice, tokenAmount);
+
         launchpad.claimTokens(tokenAmount);
         vm.stopPrank();
         assertEq(launchpad.totalClaimedAmount(), tokenAmount);
