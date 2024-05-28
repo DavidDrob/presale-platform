@@ -198,7 +198,6 @@ abstract contract MurkyBase {
     }
 }
 
-
 contract Merkle is MurkyBase {
     /**
      *

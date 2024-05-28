@@ -1,5 +1,13 @@
 pragma solidity ^0.8.20;
 
+// init
+error InvalidEthPrice();
+error InvalidMinTokenBuy();
+error InvalidMaxTokenBuy();
+error InvalidStartDate();
+error InvalidEndDate();
+error ZeroAddress();
+
 // presale
 error PresaleAlreadyStarted();
 error PresaleEnded();
@@ -22,7 +30,6 @@ error ClaimingAlreadyStarted();
 
 // other
 error AmountZero();
-error InvalidEndDate();
 error InvalidReleaseDelay();
 error PriceTooLow();
 error OnlyOperator();

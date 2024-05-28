@@ -15,26 +15,22 @@ contract LaunchpadFactory {
         return address(new Launchpad{salt: _salt}(_info, protocolFee, treasury, msg.sender, address(this)));
     }
 
-    function getLaunchpadAddress(bytes32 salt, MainLaunchpadInfo memory _info, uint256 _protocolFee, address
-     _protocolFeeAddress, address _operator, address _factory) public view returns (address) {
-        bytes memory params = abi.encode(
-            _info,
-            _protocolFee,
-            _protocolFeeAddress,
-            _operator,
-            _factory
-        );
+    function getLaunchpadAddress(
+        bytes32 salt,
+        MainLaunchpadInfo memory _info,
+        uint256 _protocolFee,
+        address _protocolFeeAddress,
+        address _operator,
+        address _factory
+    ) public view returns (address) {
+        bytes memory params = abi.encode(_info, _protocolFee, _protocolFeeAddress, _operator, _factory);
 
         bytes memory code = abi.encodePacked(type(Launchpad).creationCode, params);
         bytes32 hash = keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, keccak256(code)));
         return address(uint160(uint256(hash)));
     }
-        
-    function calculateSalt(address operator, string memory name, address token)
-        external
-        pure
-        returns (bytes32)
-    {
+
+    function calculateSalt(address operator, string memory name, address token) external pure returns (bytes32) {
         return keccak256(abi.encode(operator, name, token));
     }
 

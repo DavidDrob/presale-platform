@@ -8,24 +8,25 @@ import "src/Launchpad.sol";
 import "./utils/SampleData.sol";
 
 contract LaunchpadFactoryTest is Test {
-	address team = makeAddr("team");
-	address treasury = makeAddr("treasury");
-	uint256 protocolFee = 1000; // 10% in BP
-	ERC20Mock mockToken;
+    address team = makeAddr("team");
+    address treasury = makeAddr("treasury");
+    uint256 protocolFee = 1000; // 10% in BP
+    ERC20Mock mockToken;
     LaunchpadFactory factory;
 
-	function setUp() public {
+    function setUp() public {
         factory = new LaunchpadFactory(protocolFee, treasury);
 
-		mockToken = new ERC20Mock();
-		mockToken.mint(team, 100_000e18);
+        mockToken = new ERC20Mock();
+        mockToken.mint(team, 100_000e18);
     }
 
     function test_deployLaunchpad() public {
         // calculate address via CREATE2
         MainLaunchpadInfo memory info = SampleData._getSampleInfo(address(mockToken));
         bytes32 salt = factory.calculateSalt(team, info.name, address(info.token));
-        address launchPadAddress = factory.getLaunchpadAddress(salt, info, protocolFee, treasury, team, address(factory));
+        address launchPadAddress =
+            factory.getLaunchpadAddress(salt, info, protocolFee, treasury, team, address(factory));
 
         vm.startPrank(team);
         mockToken.approve(launchPadAddress, info.tokenHardCap);

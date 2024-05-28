@@ -1,7 +1,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "forge-std/StdMath.sol"; 
+import "forge-std/StdMath.sol";
 import "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
 import "src/Launchpad.sol";
@@ -13,189 +13,189 @@ import "./utils/SampleData.sol";
 import {Merkle} from "./utils/Murky.sol";
 
 contract LaunchPadTest is Test {
-    using stdMath for uint;
+    using stdMath for uint256;
 
-	address team = makeAddr("team");
-	address treasury = makeAddr("treasury");
-	uint256 protocolFee = 1000; // 1% in BP
+    address team = makeAddr("team");
+    address treasury = makeAddr("treasury");
+    uint256 protocolFee = 1000; // 1% in BP
 
-	ERC20Mock mockToken;
-	Launchpad launchpad;
+    ERC20Mock mockToken;
+    Launchpad launchpad;
     LaunchpadFactory factory;
 
-	function setUp() public {
+    function setUp() public {
         factory = new LaunchpadFactory(protocolFee, treasury);
 
         mockToken = new ERC20Mock();
         mockToken.mint(team, 100_000e18);
 
-		// skip, so block.timestamp doesn't underflow in some tests
-		skip(11 days);
+        // skip, so block.timestamp doesn't underflow in some tests
+        skip(11 days);
 
-		MainLaunchpadInfo memory info = SampleData._getSampleInfo(address(mockToken));
+        MainLaunchpadInfo memory info = SampleData._getSampleInfo(address(mockToken));
         bytes32 salt = factory.calculateSalt(team, info.name, address(info.token));
-        address launchPadAddress = factory.getLaunchpadAddress(salt, info, protocolFee, treasury, team, address(factory));
+        address launchPadAddress =
+            factory.getLaunchpadAddress(salt, info, protocolFee, treasury, team, address(factory));
 
-		vm.startPrank(team);
+        vm.startPrank(team);
         mockToken.approve(launchPadAddress, type(uint256).max);
         launchpad = Launchpad(factory.createLaunchpad(info, salt));
-		vm.stopPrank();
-	}
+        vm.stopPrank();
+    }
 
-	function test_periods() public {
-		assertEq(launchpad.isStarted(), false);
+    function test_periods() public {
+        assertEq(launchpad.isStarted(), false);
 
-		skip(2 days);
+        skip(2 days);
 
-		assertEq(launchpad.isStarted(), true);
-		assertEq(launchpad.isEnded(), false);
+        assertEq(launchpad.isStarted(), true);
+        assertEq(launchpad.isEnded(), false);
 
-		skip(5 days);
+        skip(5 days);
 
-		assertEq(launchpad.isStarted(), true);
-		assertEq(launchpad.isEnded(), true);
-	}
+        assertEq(launchpad.isStarted(), true);
+        assertEq(launchpad.isEnded(), true);
+    }
 
-	function test_updateStartDate(uint _newDate) public {
-		vm.assume(_newDate < launchpad.endDate());
+    function test_updateStartDate(uint256 _newDate) public {
+        vm.assume(_newDate < launchpad.endDate());
 
-		vm.prank(team);
-		launchpad.updateStartDate(_newDate);
+        vm.prank(team);
+        launchpad.updateStartDate(_newDate);
 
-		assertLt(launchpad.startDate(), launchpad.endDate());
-		assertEq(launchpad.startDate(), _newDate);
-	}
+        assertLt(launchpad.startDate(), launchpad.endDate());
+        assertEq(launchpad.startDate(), _newDate);
+    }
 
-	function test_updateEndDate(uint _newDate) public {
-		vm.assume(_newDate > launchpad.startDate());
+    function test_updateEndDate(uint256 _newDate) public {
+        vm.assume(_newDate > launchpad.startDate());
 
-		vm.prank(team);
-		launchpad.updateEndDate(_newDate);
+        vm.prank(team);
+        launchpad.updateEndDate(_newDate);
 
-		assertLt(launchpad.startDate(), launchpad.endDate());
-		assertEq(launchpad.endDate(), _newDate);
-	}
+        assertLt(launchpad.startDate(), launchpad.endDate());
+        assertEq(launchpad.endDate(), _newDate);
+    }
 
-	function test_updateEthPricePerToken(uint256 _amount) public {
+    function test_updateEthPricePerToken(uint256 _amount) public {
         vm.assume(_amount > 0);
 
         vm.expectEmit();
         emit LaunchpadEvents.EthPricePerTokenUpdated(address(mockToken), _amount);
 
-		vm.prank(team);
-		launchpad.updateEthPricePerToken(_amount);
+        vm.prank(team);
+        launchpad.updateEthPricePerToken(_amount);
 
-		assertEq(launchpad.ethPricePerToken(), _amount);
+        assertEq(launchpad.ethPricePerToken(), _amount);
 
         skip(launchpad.startDate());
 
-		vm.prank(team);
+        vm.prank(team);
         vm.expectRevert(PresaleAlreadyStarted.selector);
-		launchpad.updateEthPricePerToken(_amount);
-	}
+        launchpad.updateEthPricePerToken(_amount);
+    }
 
-	function test_setVestingDuration() public {
+    function test_setVestingDuration() public {
         vm.expectEmit();
         emit LaunchpadEvents.VestingDurationUpdated(8 days);
 
-		vm.prank(team);
-		launchpad.setVestingDuration(8 days);
+        vm.prank(team);
+        launchpad.setVestingDuration(8 days);
 
-		assertEq(launchpad.vestingDuration(), 8 days);
+        assertEq(launchpad.vestingDuration(), 8 days);
 
         skip(launchpad.endDate() + launchpad.releaseDelay());
 
-		vm.prank(team);
+        vm.prank(team);
         vm.expectRevert(ClaimingAlreadyStarted.selector);
-		launchpad.setVestingDuration(7 days);
-	}
+        launchpad.setVestingDuration(7 days);
+    }
 
-	function test_transferOperatorOwnership() public {
+    function test_transferOperatorOwnership() public {
         address alice = makeAddr("alice");
         address badActor = makeAddr("badActor");
 
         vm.expectEmit();
         emit LaunchpadEvents.OperatorTransferred(launchpad.operator(), alice);
 
-		vm.prank(team);
-		launchpad.transferOperatorOwnership(alice);
+        vm.prank(team);
+        launchpad.transferOperatorOwnership(alice);
 
-		assertEq(launchpad.operator(), alice);
+        assertEq(launchpad.operator(), alice);
 
-		vm.prank(badActor);
+        vm.prank(badActor);
         vm.expectRevert(OnlyOperator.selector);
-		launchpad.transferOperatorOwnership(team);
+        launchpad.transferOperatorOwnership(team);
 
-		assertNotEq(launchpad.operator(), team);
+        assertNotEq(launchpad.operator(), team);
     }
 
-	function test_onlyOperator() public {
-		string memory nameBefore = launchpad.name();
+    function test_onlyOperator() public {
+        string memory nameBefore = launchpad.name();
 
-		vm.prank(makeAddr("badActor"));
-		vm.expectRevert();
-		launchpad.setName("Foobar");
+        vm.prank(makeAddr("badActor"));
+        vm.expectRevert();
+        launchpad.setName("Foobar");
 
-		assertEq(launchpad.name(), nameBefore);
+        assertEq(launchpad.name(), nameBefore);
 
-		vm.prank(team);
-		launchpad.setName("Foobar");
-		
-		assertNotEq(launchpad.name(), nameBefore);
-	}
+        vm.prank(team);
+        launchpad.setName("Foobar");
 
-	function test_tokenAmountInLaunchpad(uint _increase) public {
-		vm.assume(_increase < 100_000 ether - 1_000 ether);
-		assertGe(mockToken.balanceOf(address(launchpad)), 1_000 ether);
+        assertNotEq(launchpad.name(), nameBefore);
+    }
+
+    function test_tokenAmountInLaunchpad(uint256 _increase) public {
+        vm.assume(_increase < 100_000 ether - 1_000 ether);
+        assertGe(mockToken.balanceOf(address(launchpad)), 1_000 ether);
 
         vm.expectEmit();
         emit LaunchpadEvents.TokenHardCapUpdated(address(mockToken), launchpad.tokenHardCap() + _increase);
 
-		vm.startPrank(team);
-		launchpad.increaseHardCap(_increase);
+        vm.startPrank(team);
+        launchpad.increaseHardCap(_increase);
 
-		assertGe(mockToken.balanceOf(address(launchpad)), _increase + 1_000 ether);
-	}
+        assertGe(mockToken.balanceOf(address(launchpad)), _increase + 1_000 ether);
+    }
 
-	function test_buy(uint _amount) public {
-		vm.assume(_amount >= launchpad.ethPricePerToken()
-               && _amount <= launchpad.tokenToEth(launchpad.tokenHardCap()));
+    function test_buy(uint256 _amount) public {
+        vm.assume(_amount >= launchpad.ethPricePerToken() && _amount <= launchpad.tokenToEth(launchpad.tokenHardCap()));
 
-		address alice = makeAddr("alice");
-		vm.deal(alice, type(uint256).max);
+        address alice = makeAddr("alice");
+        vm.deal(alice, type(uint256).max);
 
-		bytes32[] memory emptyBytes;
-		uint256 totalAmountBefore = launchpad.totalPurchasedAmount();
+        bytes32[] memory emptyBytes;
+        uint256 totalAmountBefore = launchpad.totalPurchasedAmount();
 
-		vm.prank(alice);
-		vm.expectRevert(); // TODO: add reason
-		launchpad.buyTokens{value: _amount}(emptyBytes);
-		
-		assertEq(launchpad.purchasedAmount(alice), 0);
-		assertEq(launchpad.totalPurchasedAmount(), 0);
+        vm.prank(alice);
+        vm.expectRevert(); // TODO: add reason
+        launchpad.buyTokens{value: _amount}(emptyBytes);
 
-		skip(2 days);
+        assertEq(launchpad.purchasedAmount(alice), 0);
+        assertEq(launchpad.totalPurchasedAmount(), 0);
+
+        skip(2 days);
 
         vm.expectEmit();
         emit LaunchpadEvents.TokensPurchased(address(mockToken), alice, launchpad.ethToToken(_amount));
 
-		vm.prank(alice);
-		launchpad.buyTokens{value: _amount}(emptyBytes);
+        vm.prank(alice);
+        launchpad.buyTokens{value: _amount}(emptyBytes);
 
-		assertEq(launchpad.purchasedAmount(alice), launchpad.ethToToken(_amount));
-		assertEq(launchpad.totalPurchasedAmount(), totalAmountBefore + launchpad.ethToToken(_amount));
+        assertEq(launchpad.purchasedAmount(alice), launchpad.ethToToken(_amount));
+        assertEq(launchpad.totalPurchasedAmount(), totalAmountBefore + launchpad.ethToToken(_amount));
 
-		skip(5 days);
-		vm.prank(alice);
-		vm.expectRevert();
-		launchpad.buyTokens{value: _amount}(emptyBytes);
-	}
+        skip(5 days);
+        vm.prank(alice);
+        vm.expectRevert();
+        launchpad.buyTokens{value: _amount}(emptyBytes);
+    }
 
     function test_whitelist() public {
-		address alice = makeAddr("alice");
-		address bob = makeAddr("bob");
-		vm.deal(alice, type(uint256).max);
-		vm.deal(bob, type(uint256).max);
+        address alice = makeAddr("alice");
+        address bob = makeAddr("bob");
+        vm.deal(alice, type(uint256).max);
+        vm.deal(bob, type(uint256).max);
 
         skip(2 days);
 
@@ -213,26 +213,26 @@ contract LaunchPadTest is Test {
 
         bytes32[] memory proof = m.getProof(data, 0);
         vm.prank(alice);
-		launchpad.buyTokens{value: 20e18}(proof);
+        launchpad.buyTokens{value: 20e18}(proof);
 
         vm.prank(bob);
         vm.expectRevert(NotWhitelisted.selector);
-		launchpad.buyTokens{value: 20e18}(proof);
+        launchpad.buyTokens{value: 20e18}(proof);
 
         proof = m.getProof(data, 1);
         vm.prank(bob);
-		launchpad.buyTokens{value: 20e18}(proof);
+        launchpad.buyTokens{value: 20e18}(proof);
     }
 
     function test_transferOwnership() public {
-		address alice = makeAddr("alice");
-		address bob = makeAddr("bob");
-		vm.deal(alice, type(uint256).max);
-		bytes32[] memory emptyBytes;
+        address alice = makeAddr("alice");
+        address bob = makeAddr("bob");
+        vm.deal(alice, type(uint256).max);
+        bytes32[] memory emptyBytes;
 
-		skip(2 days);
-		vm.prank(alice);
-		launchpad.buyTokens{value: 20e18}(emptyBytes);
+        skip(2 days);
+        vm.prank(alice);
+        launchpad.buyTokens{value: 20e18}(emptyBytes);
         uint256 aliceBalance = launchpad.purchasedAmount(alice);
 
         assertNotEq(launchpad.purchasedAmount(alice), 0);
@@ -250,9 +250,9 @@ contract LaunchPadTest is Test {
     }
 
     function test_cantCreateLpBeforePresaleEnd() public {
-		assertEq(launchpad.isStarted(), false);
+        assertEq(launchpad.isStarted(), false);
         skip(2 days);
-		assertEq(launchpad.isStarted(), true);
+        assertEq(launchpad.isStarted(), true);
 
         vm.prank(team);
         vm.expectRevert(PresaleNotEnded.selector);
@@ -278,7 +278,7 @@ contract LaunchPadTest is Test {
         vm.expectRevert(PresaleNotEnded.selector);
         launchpad.terminateLiquidity();
 
-        skip(5 days); // presale end 
+        skip(5 days); // presale end
         vm.expectRevert(OnlyOperator.selector);
         launchpad.terminateLiquidity();
 
@@ -315,8 +315,8 @@ contract LaunchPadTest is Test {
         vm.prank(alice);
         launchpad.buyTokens{value: 100e18}(emptyBytes);
 
-        uint ethInAfterFee = ((100e18 * (10_000 - protocolFee)) / 10_000);
-        uint tokenIn = ((ethInAfterFee * launchpad.decimals()) / launchpad.ethPricePerToken()) - 10e18;
+        uint256 ethInAfterFee = ((100e18 * (10_000 - protocolFee)) / 10_000);
+        uint256 tokenIn = ((ethInAfterFee * launchpad.decimals()) / launchpad.ethPricePerToken()) - 10e18;
 
         skip(5 days); // presale end, only operator can terminate
 
@@ -334,12 +334,12 @@ contract LaunchPadTest is Test {
         vm.expectRevert(PresaleNotEnded.selector);
         launchpad.terminateLiquidity();
 
-        skip(5 days); // presale end 
+        skip(5 days); // presale end
         vm.expectRevert(OnlyOperator.selector);
         launchpad.terminateLiquidity();
     }
 
-	function test_createLP(uint256 _offset) public {
+    function test_createLP(uint256 _offset) public {
         vm.assume(_offset >= 1e18 && _offset < 500e18); // the higher the offset, the higher new price will be
 
         address alice = makeAddr("alice");
@@ -356,22 +356,21 @@ contract LaunchPadTest is Test {
         vm.expectRevert(HardCapOverflow.selector);
         launchpad.buyTokens{value: 1e18}(emptyBytes);
 
-
         skip(6 days);
 
-        uint ethInAfterFee = ((100e18 * (10_000 - protocolFee)) / 10_000);
-        uint tokenIn = ((ethInAfterFee * launchpad.decimals()) / launchpad.ethPricePerToken()) - _offset;
+        uint256 ethInAfterFee = ((100e18 * (10_000 - protocolFee)) / 10_000);
+        uint256 tokenIn = ((ethInAfterFee * launchpad.decimals()) / launchpad.ethPricePerToken()) - _offset;
 
         vm.prank(team);
         address pool = launchpad.createLp(tokenIn);
 
         assertFalse(pool == address(0));
 
-        uint newEthpricePerToken = UniswapV2Library.quote(1 ether, tokenIn, ethInAfterFee);
+        uint256 newEthpricePerToken = UniswapV2Library.quote(1 ether, tokenIn, ethInAfterFee);
         assertGt(newEthpricePerToken, launchpad.ethPricePerToken());
-	}
+    }
 
-	function test_factoryReceivesFees(uint256 _buyAmount) public {
+    function test_factoryReceivesFees(uint256 _buyAmount) public {
         vm.assume(_buyAmount >= 1e18 && _buyAmount <= 100e18);
 
         address alice = makeAddr("alice");
@@ -396,7 +395,7 @@ contract LaunchPadTest is Test {
         assertGe(address(factory).balance, factoryBalanceBefore + (_buyAmount - ethInAfterFee));
     }
 
-	function test_linearVestingPeriods() public {
+    function test_linearVestingPeriods() public {
         // Arange
         address alice = makeAddr("alice");
         address bob = makeAddr("bob");
