@@ -21,6 +21,7 @@ error CapForPeriodReached();
 // other
 error AmountZero();
 error InvalidEndDate();
+error InvalidReleaseDelay();
 error InvalidVestingDuration();
 error PriceTooLow();
 error OnlyOperator();

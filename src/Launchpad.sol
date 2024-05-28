@@ -2,6 +2,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./Errors.sol";
 
@@ -25,7 +26,7 @@ struct MainLaunchpadInfo {
 }
 
 
-contract Launchpad {
+contract Launchpad is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // Events
@@ -48,11 +49,6 @@ contract Launchpad {
 
         _;
     }
-
-    // use OZ implementation
-    modifier nonReentrant() {
-        _;
-    } 
 
     // constants
     address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -91,6 +87,8 @@ contract Launchpad {
     //  Constructor
     constructor(MainLaunchpadInfo memory _info, uint256 _protocolFee, address
     _protocolFeeAddress, address _operator, address _factory) {
+        if (_info.releaseDelay == 0) revert InvalidReleaseDelay();
+
         name = _info.name;
         token = _info.token;
         ethPricePerToken = _info.ethPricePerToken;
