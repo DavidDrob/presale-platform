@@ -365,8 +365,6 @@ contract LaunchPadTest is Test {
         uint256 ethInAfterFee = ((40e18 * (10_000 - protocolFee)) / 10_000);
         uint256 tokenIn = ((ethInAfterFee * launchpad.decimals()) / launchpad.ethPricePerToken()) - 1e18;
 
-        uint256 dailyMax = 57.14e18; // TODO: calculate the value
-
         vm.prank(team);
         launchpad.createLp(tokenIn);
 
@@ -376,6 +374,8 @@ contract LaunchPadTest is Test {
         launchpad.claimTokens(1e18);
 
         skip(1 days);
+
+        uint256 dailyMax = launchpad.availableNow();
 
         vm.expectRevert(AmountZero.selector);
         launchpad.claimTokens(0);
@@ -411,5 +411,44 @@ contract LaunchPadTest is Test {
         vm.prank(alice);
         launchpad.claimTokens(tokenAmount);
         assertEq(mockToken.balanceOf(alice), aliceBefore + tokenAmount);
+    }
+
+    function test_claimableAmountNow() public {
+        address alice = makeAddr("alice");
+        address bob = makeAddr("bob");
+        vm.deal(alice, type(uint256).max);
+        vm.deal(bob, type(uint256).max);
+
+        skip(2 days);
+
+        bytes32[] memory emptyBytes;
+        vm.prank(alice);
+        launchpad.buyTokens{value: 20e18}(emptyBytes);
+        vm.prank(bob);
+        launchpad.buyTokens{value: 20e18}(emptyBytes);
+
+        skip(6 days);
+
+        uint256 ethInAfterFee = ((40e18 * (10_000 - protocolFee)) / 10_000);
+        uint256 tokenIn = ((ethInAfterFee * launchpad.decimals()) / launchpad.ethPricePerToken()) - 1e18;
+
+        vm.prank(team);
+        launchpad.createLp(tokenIn);
+
+        uint256 dailyMax = launchpad.availableNow();
+
+        vm.startPrank(alice);
+        launchpad.claimTokens(dailyMax);
+
+        assertEq(launchpad.claimableAmountNow(bob), 0);
+
+        skip(2 days);
+
+        vm.startPrank(alice);
+        launchpad.claimTokens(2 * dailyMax);
+
+        skip(5 days);
+
+        assertEq(launchpad.claimableAmountNow(alice), 200e18 - (3 * dailyMax));
     }
 }

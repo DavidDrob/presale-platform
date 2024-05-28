@@ -269,15 +269,24 @@ contract Launchpad is ReentrancyGuard {
         totalPurchasedAmount += tokenAmount;
     }
 
+    function availableNow() public view returns (uint256) {
+        uint256 daysSinceVestingStart = ((block.timestamp - (endDate + releaseDelay)) / 1 days) + 1; // rounds down automatically
+        return ((releasePerDay * daysSinceVestingStart) - totalClaimedAmount);
+    }
+
     function claimableAmount(address _address) public view returns (uint256) {
         return purchasedAmount[_address] - claimedAmount[_address];
     }
 
     function claimableAmountNow(address _address) public view returns (uint256) {
-        // TODO: calculate max amount for the current vesting timeframe
-        // return Math.min(maxAmount, purchaseAmount-claimedAmount);
+        uint256 claimableUser = claimableAmount(_address);
+        uint256 availableTokens = availableNow();
 
-        return 0;
+        if (claimableUser >= availableTokens) {
+            return availableTokens;
+        } else {
+            return claimableUser;
+        }
     }
 
     // IDEA: figure out how to calculate an amount so that
@@ -288,8 +297,7 @@ contract Launchpad is ReentrancyGuard {
         if (_amount == 0) revert AmountZero();
         if (_amount > claimableAmount(msg.sender)) revert ExceedClaimableAmount();
 
-        uint256 daysSinceVestingStart = ((block.timestamp - (endDate + releaseDelay)) / 1 days) + 1; // rounds down automatically
-        uint256 availableTokens = ((releasePerDay * daysSinceVestingStart) - totalClaimedAmount);
+        uint256 availableTokens = availableNow();
 
         if (_amount > availableTokens) revert CapForPeriodReached();
 
