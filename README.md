@@ -1,66 +1,20 @@
-## Foundry
+## Presale Platform
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+**Factory and launchpad contracts to create a presale for an ERC-20 token**
 
-Foundry consists of:
+During the presale, the launchpad uses a fixed price for the token. It includes an optional whitelist for buying. After the presale, the team can create a liquidity pool (LP) on UniswapV2 to begin the linear token vesting. The token's price inside the LP is guaranteed to be higher than it was during the presale. If the team fails to create an LP, users will be able to withdraw their deposited native token.
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## Test
 
-## Documentation
+1. Make sure you have foundry installed and run `forge install`
+2. Copy `.env.example` into `.env` and add your `ETH_RPC_URL` and `ETHERSCAN_API_KEY`
+3. Run `make tests` to run all tests or `make test-test test=[name]` to run a specific test
 
-https://book.getfoundry.sh/
+ 
+## Future plan
 
-## Usage
-
-### Build
-
-```shell
-$ forge build
-```
-
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+- Deployment scripts
+- Whitelist: Max amount of tokens a user can buy
+- Dynamic pricing formula (dutch auction, bonding curve, ...)
+- More vesting options
+- Creating LP using different protocols
