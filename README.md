@@ -11,10 +11,10 @@ During the presale, the launchpad uses a fixed price for the token. It includes 
 3. Run `make tests` to run all tests or `make test-test test=[name]` to run a specific test
 
  
-## Future plan
+## Future plans
 
 - Deployment scripts
-- Whitelist: Max amount of tokens a user can buy
+- Whitelist: add max amount of tokens a user can buy
 - Dynamic pricing formula (dutch auction, bonding curve, ...)
 - More vesting options
 - Creating LP using different protocols

@@ -15,9 +15,15 @@ import {Merkle} from "./utils/Murky.sol";
 contract LaunchPadTest is Test {
     using stdMath for uint256;
 
+    address alice = makeAddr("alice");
+    address bob = makeAddr("bob");
+    address badActor = makeAddr("badActor");
+    
     address team = makeAddr("team");
     address treasury = makeAddr("treasury");
     uint256 protocolFee = 1000; // 1% in BP
+
+    bytes32[] public emptyBytes;
 
     ERC20Mock mockToken;
     Launchpad launchpad;
@@ -28,6 +34,9 @@ contract LaunchPadTest is Test {
 
         mockToken = new ERC20Mock();
         mockToken.mint(team, 100_000e18);
+
+        vm.deal(alice, type(uint256).max);
+        vm.deal(bob, type(uint256).max);
 
         // skip, so block.timestamp doesn't underflow in some tests
         skip(11 days);
@@ -112,9 +121,6 @@ contract LaunchPadTest is Test {
     }
 
     function test_transferOperatorOwnership() public {
-        address alice = makeAddr("alice");
-        address badActor = makeAddr("badActor");
-
         vm.expectEmit();
         emit LaunchpadEvents.OperatorTransferred(launchpad.operator(), alice);
 
@@ -133,8 +139,8 @@ contract LaunchPadTest is Test {
     function test_onlyOperator() public {
         string memory nameBefore = launchpad.name();
 
-        vm.prank(makeAddr("badActor"));
-        vm.expectRevert();
+        vm.prank(badActor);
+        vm.expectRevert(OnlyOperator.selector);
         launchpad.setName("Foobar");
 
         assertEq(launchpad.name(), nameBefore);
@@ -161,14 +167,10 @@ contract LaunchPadTest is Test {
     function test_buy(uint256 _amount) public {
         vm.assume(_amount >= launchpad.ethPricePerToken() && _amount <= launchpad.tokenToEth(launchpad.tokenHardCap()));
 
-        address alice = makeAddr("alice");
-        vm.deal(alice, type(uint256).max);
-
-        bytes32[] memory emptyBytes;
         uint256 totalAmountBefore = launchpad.totalPurchasedAmount();
 
         vm.prank(alice);
-        vm.expectRevert(); // TODO: add reason
+        vm.expectRevert(PresaleNotStarted.selector);
         launchpad.buyTokens{value: _amount}(emptyBytes);
 
         assertEq(launchpad.purchasedAmount(alice), 0);
@@ -187,16 +189,11 @@ contract LaunchPadTest is Test {
 
         skip(5 days);
         vm.prank(alice);
-        vm.expectRevert();
+        vm.expectRevert(PresaleEnded.selector);
         launchpad.buyTokens{value: _amount}(emptyBytes);
     }
 
     function test_whitelist() public {
-        address alice = makeAddr("alice");
-        address bob = makeAddr("bob");
-        vm.deal(alice, type(uint256).max);
-        vm.deal(bob, type(uint256).max);
-
         skip(2 days);
 
         bytes32[] memory data = new bytes32[](2);
@@ -225,12 +222,8 @@ contract LaunchPadTest is Test {
     }
 
     function test_transferOwnership() public {
-        address alice = makeAddr("alice");
-        address bob = makeAddr("bob");
-        vm.deal(alice, type(uint256).max);
-        bytes32[] memory emptyBytes;
-
         skip(2 days);
+
         vm.prank(alice);
         launchpad.buyTokens{value: 20e18}(emptyBytes);
         uint256 aliceBalance = launchpad.purchasedAmount(alice);
@@ -268,9 +261,7 @@ contract LaunchPadTest is Test {
         uint256 depositAmount = 10e18;
 
         skip(2 days);
-        address alice = makeAddr("alice");
-        vm.deal(alice, type(uint256).max);
-        bytes32[] memory emptyBytes;
+ 
         vm.prank(alice);
         launchpad.buyTokens{value: depositAmount}(emptyBytes);
 
@@ -305,13 +296,9 @@ contract LaunchPadTest is Test {
     }
 
     function test_cantTerminateLiquidityWhenLpExists() public {
-        address alice = makeAddr("alice");
-        vm.deal(alice, type(uint256).max);
-
         skip(2 days);
 
         // alice buys all tokens
-        bytes32[] memory emptyBytes;
         vm.prank(alice);
         launchpad.buyTokens{value: 100e18}(emptyBytes);
 
@@ -342,13 +329,9 @@ contract LaunchPadTest is Test {
     function test_createLP(uint256 _offset) public {
         vm.assume(_offset >= 1e18 && _offset < 500e18); // the higher the offset, the higher new price will be
 
-        address alice = makeAddr("alice");
-        vm.deal(alice, type(uint256).max);
-
         skip(2 days);
 
         // alice buys all tokens
-        bytes32[] memory emptyBytes;
         vm.prank(alice);
         launchpad.buyTokens{value: 100e18}(emptyBytes);
 
@@ -373,12 +356,8 @@ contract LaunchPadTest is Test {
     function test_factoryReceivesFees(uint256 _buyAmount) public {
         vm.assume(_buyAmount >= 1e18 && _buyAmount <= 100e18);
 
-        address alice = makeAddr("alice");
-        vm.deal(alice, type(uint256).max);
-
         skip(2 days);
-
-        bytes32[] memory emptyBytes;
+ 
         vm.prank(alice);
         launchpad.buyTokens{value: _buyAmount}(emptyBytes);
 
@@ -397,14 +376,8 @@ contract LaunchPadTest is Test {
 
     function test_linearVestingPeriods() public {
         // Arange
-        address alice = makeAddr("alice");
-        address bob = makeAddr("bob");
-        vm.deal(alice, type(uint256).max);
-        vm.deal(bob, type(uint256).max);
-
         skip(2 days);
 
-        bytes32[] memory emptyBytes;
         vm.prank(alice);
         launchpad.buyTokens{value: 20e18}(emptyBytes);
         vm.prank(bob);
@@ -467,14 +440,8 @@ contract LaunchPadTest is Test {
     }
 
     function test_claimableAmountNow() public {
-        address alice = makeAddr("alice");
-        address bob = makeAddr("bob");
-        vm.deal(alice, type(uint256).max);
-        vm.deal(bob, type(uint256).max);
-
         skip(2 days);
-
-        bytes32[] memory emptyBytes;
+ 
         vm.prank(alice);
         launchpad.buyTokens{value: 20e18}(emptyBytes);
         vm.prank(bob);
